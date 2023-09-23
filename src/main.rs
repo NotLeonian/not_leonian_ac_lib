@@ -97,6 +97,12 @@ impl Outputif for bool {
     }
 }
 
+/// ベクターの先頭にfilledを追加してmだけ右にずらす関数のトレイト
+trait MoveRight where Self: std::ops::Index<usize> {
+    /// ベクターの先頭にfilledを追加してmだけ右にずらす関数
+    fn move_right(&mut self, m: usize, filled: Self::Output);
+}
+
 /// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
 #[allow(dead_code)]
 fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec::<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
@@ -213,10 +219,15 @@ impl<T> ChminmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: st
     }
 }
 
-#[allow(dead_code)]
-type VecGraph=Vec<Vec<(usize,usize)>>;
-#[allow(dead_code)]
-type SetGraph=Vec::<std::collections::BTreeSet::<(usize,usize)>>;
+struct VecGraph {
+    adj_list: Vec<Vec<(usize,usize)>>,
+    vertex_info: Vec::<usize>
+}
+
+struct SetGraph {
+    adj_list: Vec::<std::collections::BTreeSet::<(usize,usize)>>,
+    vertex_info: Vec::<usize>
+}
 
 /// グラフについてのトレイト ((usize,usize)の2次元ベクターと(usize,usize)のBTreeSetのベクターについて実装)
 trait Graph where Self: Sized {
@@ -226,8 +237,8 @@ trait Graph where Self: Sized {
     fn size(&self) -> usize;
     /// 辺を追加する関数
     fn push(&mut self, a: usize, b: usize, w: usize);
-    /// 子を見る関数
-    fn see_child<F>(&self, v: usize, seen: &mut Vec::<bool>, func: F) where F: FnMut(usize,usize);
+    /// 点に数の情報を追加する関数
+    fn inform(&mut self, c: &Vec::<usize>);
     /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
     fn construct_graph(n: usize, m: usize, ab: &Vec::<(usize,usize)>) -> Self {
         assert!(ab.len()==m);
@@ -266,99 +277,194 @@ trait Graph where Self: Sized {
         }
         return g;
     }
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧、点の数の一覧から隣接リストを構築する関数（0-indexed）
+    fn construct_informed_graph(n: usize, m: usize, abw: &Vec::<(usize,usize,usize)>, c: &Vec::<usize>) -> Self {
+        assert!(abw.len()==m);
+        let mut g: Self=Graph::new(n);
+        for &(a,b,w) in abw {
+            g.push(a, b, w);
+            g.push(b, a, w);
+        }
+        g.inform(c);
+        return g;
+    }
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧、点の数の一覧から隣接リストを構築する関数（0-indexed）
+    fn construct_informed_directed_graph(n: usize, m: usize, abw: &Vec::<(usize,usize,usize)>, c: &Vec::<usize>) -> Self {
+        assert!(abw.len()==m);
+        let mut g: Self=Graph::new(n);
+        for &(a,b,w) in abw {
+            g.push(a, b, w);
+        }
+        g.inform(c);
+        return g;
+    }
     /// DFSの関数
-    fn dfs<F1,F2,F3>(&self, start: usize, mut preorder: F1, mut inorder: F2, mut postorder: F3) where F1: FnMut(usize), F2: FnMut(usize,usize,usize), F3: FnMut(usize) {
+    fn dfs<F1,Fd,F2,F3,F4>(&mut self, start: usize, preorder: F1, adj_determine: Fd, inorder: F2, already: F3, postorder: F4) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F4: FnMut(usize,&mut Vec::<usize>) -> bool;
+    /// BFSの関数
+    fn bfs<F1,Fd,F2,F3>(&mut self, start: usize, preorder: F1, adj_determine: Fd, inorder: F2, already: F3) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool;
+}
+
+impl Graph for VecGraph {
+    fn new(n: usize) -> Self {
+        return VecGraph { adj_list: vec![Vec::<(usize,usize)>::new();n], vertex_info: vec![0usize;n] };
+    }
+    fn size(&self) -> usize {
+        return self.adj_list.len();
+    }
+    fn push(&mut self, a: usize, b: usize, w: usize) {
+        self.adj_list[a].push((b,w));
+    }
+    fn inform(&mut self, c: &Vec::<usize>) {
+        self.vertex_info=c.clone();
+    }
+    fn dfs<F1,Fd,F2,F3,F4>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3, mut postorder: F4) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F4: FnMut(usize,&mut Vec::<usize>) -> bool {
         let n=self.size();
         assert!(start<n);
         let mut seen=vec![false;n];
         seen[start]=true;
-        let mut stack=vec![n+start,start];
-        while !stack.is_empty() {
-            let v=stack.pop().unwrap();
+        let mut stack=vec![start+n,start];
+        while let Some(v)=stack.pop() {
             if v<n {
-                preorder(v);
-                self.see_child(v, &mut seen, |u,w| {
-                    stack.push(u);
-                    inorder(v,u,w);
-                });
+                if !preorder(v,&mut self.vertex_info) {
+                    return false;
+                }
+                for &(u,w) in &self.adj_list[v] {
+                    if !adj_determine(v,u,w,&mut self.vertex_info) {
+                        continue;
+                    }
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+n);
+                        stack.push(u);
+                        if !inorder(v,u,w,&mut self.vertex_info) {
+                            return false;
+                        }
+                    } else {
+                        if !already(v,u,w,&mut self.vertex_info) {
+                            return false;
+                        }
+                    }
+                }
             } else {
                 let v=v-n;
-                postorder(v);
+                if !postorder(v,&mut self.vertex_info) {
+                    return false;
+                }
             }
         }
+        return true;
     }
-    /// 帰りがけ順を省略するDFSの関数
-    fn dfs_pre_and_in<F1,F2>(&self, start: usize, mut preorder: F1, mut inorder: F2) where F1: FnMut(usize), F2: FnMut(usize,usize,usize) {
-        let n=self.size();
-        assert!(start<n);
-        let mut seen=vec![false;n];
-        seen[start]=true;
-        let mut stack=vec![start];
-        while !stack.is_empty() {
-            let v=stack.pop().unwrap();
-            preorder(v);
-            self.see_child(v, &mut seen, |u,w| {
-                stack.push(u);
-                inorder(v,u,w);
-            });
-        }
-    }
-    /// BFSの関数
-    fn bfs<F1,F2>(&self, start: usize, mut preorder: F1, mut inorder: F2) where F1: FnMut(usize), F2: FnMut(usize,usize,usize) {
+    fn bfs<F1,Fd,F2,F3>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool {
         let n=self.size();
         assert!(start<n);
         let mut seen=vec![false;n];
         seen[start]=true;
         let mut queue=std::collections::VecDeque::new();
         queue.push_back(start);
-        while !queue.is_empty() {
-            let v=queue.pop_front().unwrap();
-            preorder(v);
-            self.see_child(v, &mut seen, |u,w| {
-                queue.push_back(u);
-                inorder(v,u,w);
-            });
+        while let Some(v)=queue.pop_front() {
+            if !preorder(v,&mut self.vertex_info) {
+                return false;
+            }
+            for &(u,w) in &self.adj_list[v] {
+                if !adj_determine(v,u,w,&mut self.vertex_info) {
+                    continue;
+                }
+                if !seen[u] {
+                    seen[u]=true;
+                    queue.push_back(u);
+                    if !inorder(v,u,w,&mut self.vertex_info) {
+                        return false;
+                    }
+                } else {
+                    if !already(v,u,w,&mut self.vertex_info) {
+                        return false;
+                    }
+                }
+            }
         }
+        return true;
     }
 }
 
-impl Graph for Vec::<Vec::<(usize,usize)>> {
+impl Graph for SetGraph {
     fn new(n: usize) -> Self {
-        return vec![Vec::<(usize,usize)>::new();n];
+        return SetGraph{ adj_list: vec![std::collections::BTreeSet::<(usize,usize)>::new();n], vertex_info: vec![0usize;n] };
     }
     fn size(&self) -> usize {
-        return self.len();
+        return self.adj_list.len();
     }
     fn push(&mut self, a: usize, b: usize, w: usize) {
-        self[a].push((b,w));
+        self.adj_list[a].insert((b,w));
     }
-    fn see_child<F>(&self, v: usize, seen: &mut Vec::<bool>, mut func: F) where F: FnMut(usize,usize) {
-        for &(u,w) in &self[v] {
-            if !seen[u] {
-                seen[u]=true;
-                func(u,w);
+    fn inform(&mut self, c: &Vec::<usize>) {
+        self.vertex_info=c.clone();
+    }
+    fn dfs<F1,Fd,F2,F3,F4>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3, mut postorder: F4) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F4: FnMut(usize,&mut Vec::<usize>) -> bool {
+        let n=self.size();
+        assert!(start<n);
+        let mut seen=vec![false;n];
+        seen[start]=true;
+        let mut stack=vec![start+n,start];
+        while let Some(v)=stack.pop() {
+            if v<n {
+                if !preorder(v,&mut self.vertex_info) {
+                    return false;
+                }
+                for &(u,w) in &self.adj_list[v] {
+                    if !adj_determine(v,u,w,&mut self.vertex_info) {
+                        continue;
+                    }
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+n);
+                        stack.push(u);
+                        if !inorder(v,u,w,&mut self.vertex_info) {
+                            return false;
+                        }
+                    } else {
+                        if !already(v,u,w,&mut self.vertex_info) {
+                            return false;
+                        }
+                    }
+                }
+            } else {
+                let v=v-n;
+                if !postorder(v,&mut self.vertex_info) {
+                    return false;
+                }
             }
         }
+        return true;
     }
-}
-
-impl Graph for Vec::<std::collections::BTreeSet::<(usize,usize)>> {
-    fn new(n: usize) -> Self {
-        return vec![std::collections::BTreeSet::<(usize,usize)>::new();n];
-    }
-    fn size(&self) -> usize {
-        return self.len();
-    }
-    fn push(&mut self, a: usize, b: usize, w: usize) {
-        self[a].insert((b,w));
-    }
-    fn see_child<F>(&self, v: usize, seen: &mut Vec::<bool>, mut func: F) where F: FnMut(usize,usize) {
-        for &(u,w) in &self[v] {
-            if !seen[u] {
-                seen[u]=true;
-                func(u,w);
+    fn bfs<F1,Fd,F2,F3>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool {
+        let n=self.size();
+        assert!(start<n);
+        let mut seen=vec![false;n];
+        seen[start]=true;
+        let mut queue=std::collections::VecDeque::new();
+        queue.push_back(start);
+        while let Some(v)=queue.pop_front() {
+            if !preorder(v,&mut self.vertex_info) {
+                return false;
+            }
+            for &(u,w) in &self.adj_list[v] {
+                if !adj_determine(v,u,w,&mut self.vertex_info) {
+                    continue;
+                }
+                if !seen[u] {
+                    seen[u]=true;
+                    queue.push_back(u);
+                    if !inorder(v,u,w,&mut self.vertex_info) {
+                        return false;
+                    }
+                } else {
+                    if !already(v,u,w,&mut self.vertex_info) {
+                        return false;
+                    }
+                }
             }
         }
+        return true;
     }
 }
 
