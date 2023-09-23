@@ -103,6 +103,19 @@ trait MoveRight where Self: std::ops::Index<usize> {
     fn move_right(&mut self, m: usize, filled: Self::Output);
 }
 
+impl<T> MoveRight for Vec<T> where T: Copy {
+    fn move_right(&mut self, m: usize, filled: Self::Output) {
+        let n=self.len();
+        self.resize(n+m,filled);
+        for i in (0..n).rev() {
+            self[i+m]=self[i];
+        }
+        for i in 0..m {
+            self[i]=filled;
+        }
+    }
+}
+
 /// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
 #[allow(dead_code)]
 fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec::<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
