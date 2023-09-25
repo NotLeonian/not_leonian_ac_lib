@@ -30,7 +30,7 @@ trait Outputln {
     fn outputln(&self);
 }
 
-impl<T> Outputln for Vec::<T> where T: std::fmt::Display {
+impl<T> Outputln for Vec<T> where T: std::fmt::Display {
     fn outputln(&self) {
         for (i,var) in self.iter().enumerate() {
             if i<self.len()-1 {
@@ -42,7 +42,7 @@ impl<T> Outputln for Vec::<T> where T: std::fmt::Display {
     }
 }
 
-impl<T, const N: usize> Outputln for [T;N] where T: Sized, T: std::fmt::Display {
+impl<T, const N: usize> Outputln for [T;N] where T: Sized + std::fmt::Display {
     fn outputln(&self) {
         for (i,var) in self.iter().enumerate() {
             if i<self.len()-1 {
@@ -60,7 +60,7 @@ trait Outputlines {
     fn outputlines(&self);
 }
 
-impl<T> Outputlines for Vec::<T> where T: Outputln {
+impl<T> Outputlines for Vec<T> where T: Outputln {
     fn outputlines(&self) {
         for v in self {
             v.outputln();
@@ -68,7 +68,7 @@ impl<T> Outputlines for Vec::<T> where T: Outputln {
     }
 }
 
-impl<T, const N: usize> Outputlines for [T;N] where T: Sized, T: Outputln {
+impl<T, const N: usize> Outputlines for [T;N] where T: Sized + Outputln {
     fn outputlines(&self) {
         for v in self {
             v.outputln();
@@ -118,8 +118,32 @@ impl<T> MoveRight for Vec<T> where T: Copy {
 
 /// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
 #[allow(dead_code)]
-fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec::<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
+fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
     return (begin..end).map(|i| func(i)).collect::<Vec::<T>>();
+}
+
+/// isizeをusizeにキャストするトレイト
+trait Usize {
+    /// isizeをusizeにキャストする関数
+    fn usize(self) -> usize;
+}
+
+impl Usize for isize {
+    fn usize(self) -> usize {
+        self as usize
+    }
+}
+
+/// usizeをisizeにキャストするトレイト
+trait Isize {
+    /// usizeをisizeにキャストする関数
+    fn isize(self) -> isize;
+}
+
+impl Isize for usize {
+    fn isize(self) -> isize {
+        self as isize
+    }
 }
 
 /// max関数
@@ -150,7 +174,7 @@ trait Chminmax {
     fn chmin(&mut self, challenger: Self);
 }
 
-impl<T> Chminmax for T where T: Copy, T: std::cmp::PartialOrd {
+impl<T> Chminmax for T where T: Copy + std::cmp::PartialOrd {
     fn chmax(&mut self, challenger: Self) {
         if challenger>*self {
             *self=challenger;
@@ -171,7 +195,7 @@ trait ChminmaxVec where Self: std::ops::Index<usize> {
     fn chmin_vec(&mut self, index: usize, challenger: Self::Output);
 }
 
-impl<T> ChminmaxVec for Vec::<T> where T: Copy, T: std::cmp::PartialOrd {
+impl<T> ChminmaxVec for Vec<T> where T: Copy + std::cmp::PartialOrd {
     fn chmax_vec(&mut self, index: usize, challenger: T) {
         if challenger>self[index] {
             self[index]=challenger;
@@ -184,7 +208,7 @@ impl<T> ChminmaxVec for Vec::<T> where T: Copy, T: std::cmp::PartialOrd {
     }
 }
 
-impl<T, const N: usize> ChminmaxVec for [T;N] where T: Copy, T: std::cmp::PartialOrd {
+impl<T, const N: usize> ChminmaxVec for [T;N] where T: Copy + std::cmp::PartialOrd {
     fn chmax_vec(&mut self, index: usize, challenger: T) {
         if challenger>self[index] {
             self[index]=challenger;
@@ -232,15 +256,12 @@ impl<T> ChminmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: st
     }
 }
 
-struct VecGraph {
-    adj_list: Vec<Vec<(usize,usize)>>,
-    vertex_info: Vec::<usize>
-}
-
-struct SetGraph {
-    adj_list: Vec::<std::collections::BTreeSet::<(usize,usize)>>,
-    vertex_info: Vec::<usize>
-}
+/// 2次元ベクターによるグラフの型
+#[allow(dead_code)]
+type VecGraph=Vec<Vec<(usize,usize)>>;
+/// BTreeSetのベクターによるグラフの型
+#[allow(dead_code)]
+type SetGraph=Vec<std::collections::BTreeSet<(usize,usize)>>;
 
 /// グラフについてのトレイト ((usize,usize)の2次元ベクターと(usize,usize)のBTreeSetのベクターについて実装)
 trait Graph where Self: Sized {
@@ -250,10 +271,8 @@ trait Graph where Self: Sized {
     fn size(&self) -> usize;
     /// 辺を追加する関数
     fn push(&mut self, a: usize, b: usize, w: usize);
-    /// 点に数の情報を追加する関数
-    fn inform(&mut self, c: &Vec::<usize>);
     /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_graph(n: usize, m: usize, ab: &Vec::<(usize,usize)>) -> Self {
+    fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         assert!(ab.len()==m);
         let mut g: Self=Graph::new(n);
         for &(a,b) in ab {
@@ -263,7 +282,7 @@ trait Graph where Self: Sized {
         return g;
     }
     /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_directed_graph(n: usize, m: usize, ab: &Vec::<(usize,usize)>) -> Self {
+    fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         assert!(ab.len()==m);
         let mut g: Self=Graph::new(n);
         for &(a,b) in ab {
@@ -272,7 +291,7 @@ trait Graph where Self: Sized {
         return g;
     }
     /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_weighted_graph(n: usize, m: usize, abw: &Vec::<(usize,usize,usize)>) -> Self {
+    fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         assert!(abw.len()==m);
         let mut g: Self=Graph::new(n);
         for &(a,b,w) in abw {
@@ -282,202 +301,37 @@ trait Graph where Self: Sized {
         return g;
     }
     /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec::<(usize,usize,usize)>) -> Self {
+    fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         assert!(abw.len()==m);
         let mut g: Self=Graph::new(n);
         for &(a,b,w) in abw {
             g.push(a, b, w);
         }
         return g;
-    }
-    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧、点の数の一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_informed_graph(n: usize, m: usize, abw: &Vec::<(usize,usize,usize)>, c: &Vec::<usize>) -> Self {
-        assert!(abw.len()==m);
-        let mut g: Self=Graph::new(n);
-        for &(a,b,w) in abw {
-            g.push(a, b, w);
-            g.push(b, a, w);
-        }
-        g.inform(c);
-        return g;
-    }
-    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧、点の数の一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_informed_directed_graph(n: usize, m: usize, abw: &Vec::<(usize,usize,usize)>, c: &Vec::<usize>) -> Self {
-        assert!(abw.len()==m);
-        let mut g: Self=Graph::new(n);
-        for &(a,b,w) in abw {
-            g.push(a, b, w);
-        }
-        g.inform(c);
-        return g;
-    }
-    /// DFSの関数
-    fn dfs<F1,Fd,F2,F3,F4>(&mut self, start: usize, preorder: F1, adj_determine: Fd, inorder: F2, already: F3, postorder: F4) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F4: FnMut(usize,&mut Vec::<usize>) -> bool;
-    /// BFSの関数
-    fn bfs<F1,Fd,F2,F3>(&mut self, start: usize, preorder: F1, adj_determine: Fd, inorder: F2, already: F3) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool;
-}
-
-impl Graph for VecGraph {
-    fn new(n: usize) -> Self {
-        return VecGraph { adj_list: vec![Vec::<(usize,usize)>::new();n], vertex_info: vec![0usize;n] };
-    }
-    fn size(&self) -> usize {
-        return self.adj_list.len();
-    }
-    fn push(&mut self, a: usize, b: usize, w: usize) {
-        self.adj_list[a].push((b,w));
-    }
-    fn inform(&mut self, c: &Vec::<usize>) {
-        self.vertex_info=c.clone();
-    }
-    fn dfs<F1,Fd,F2,F3,F4>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3, mut postorder: F4) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F4: FnMut(usize,&mut Vec::<usize>) -> bool {
-        let n=self.size();
-        assert!(start<n);
-        let mut seen=vec![false;n];
-        seen[start]=true;
-        let mut stack=vec![start+n,start];
-        while let Some(v)=stack.pop() {
-            if v<n {
-                if !preorder(v,&mut self.vertex_info) {
-                    return false;
-                }
-                for &(u,w) in &self.adj_list[v] {
-                    if !adj_determine(v,u,w,&mut self.vertex_info) {
-                        continue;
-                    }
-                    if !seen[u] {
-                        seen[u]=true;
-                        stack.push(u+n);
-                        stack.push(u);
-                        if !inorder(v,u,w,&mut self.vertex_info) {
-                            return false;
-                        }
-                    } else {
-                        if !already(v,u,w,&mut self.vertex_info) {
-                            return false;
-                        }
-                    }
-                }
-            } else {
-                let v=v-n;
-                if !postorder(v,&mut self.vertex_info) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-    fn bfs<F1,Fd,F2,F3>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool {
-        let n=self.size();
-        assert!(start<n);
-        let mut seen=vec![false;n];
-        seen[start]=true;
-        let mut queue=std::collections::VecDeque::new();
-        queue.push_back(start);
-        while let Some(v)=queue.pop_front() {
-            if !preorder(v,&mut self.vertex_info) {
-                return false;
-            }
-            for &(u,w) in &self.adj_list[v] {
-                if !adj_determine(v,u,w,&mut self.vertex_info) {
-                    continue;
-                }
-                if !seen[u] {
-                    seen[u]=true;
-                    queue.push_back(u);
-                    if !inorder(v,u,w,&mut self.vertex_info) {
-                        return false;
-                    }
-                } else {
-                    if !already(v,u,w,&mut self.vertex_info) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
     }
 }
 
-impl Graph for SetGraph {
+impl Graph for Vec<Vec<(usize,usize)>> {
     fn new(n: usize) -> Self {
-        return SetGraph{ adj_list: vec![std::collections::BTreeSet::<(usize,usize)>::new();n], vertex_info: vec![0usize;n] };
+        return vec![Vec::<(usize,usize)>::new();n];
     }
     fn size(&self) -> usize {
-        return self.adj_list.len();
+        return self.len();
     }
     fn push(&mut self, a: usize, b: usize, w: usize) {
-        self.adj_list[a].insert((b,w));
+        self[a].push((b,w));
     }
-    fn inform(&mut self, c: &Vec::<usize>) {
-        self.vertex_info=c.clone();
+}
+
+impl Graph for Vec<std::collections::BTreeSet<(usize,usize)>> {
+    fn new(n: usize) -> Self {
+        return vec![std::collections::BTreeSet::<(usize,usize)>::new();n];
     }
-    fn dfs<F1,Fd,F2,F3,F4>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3, mut postorder: F4) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F4: FnMut(usize,&mut Vec::<usize>) -> bool {
-        let n=self.size();
-        assert!(start<n);
-        let mut seen=vec![false;n];
-        seen[start]=true;
-        let mut stack=vec![start+n,start];
-        while let Some(v)=stack.pop() {
-            if v<n {
-                if !preorder(v,&mut self.vertex_info) {
-                    return false;
-                }
-                for &(u,w) in &self.adj_list[v] {
-                    if !adj_determine(v,u,w,&mut self.vertex_info) {
-                        continue;
-                    }
-                    if !seen[u] {
-                        seen[u]=true;
-                        stack.push(u+n);
-                        stack.push(u);
-                        if !inorder(v,u,w,&mut self.vertex_info) {
-                            return false;
-                        }
-                    } else {
-                        if !already(v,u,w,&mut self.vertex_info) {
-                            return false;
-                        }
-                    }
-                }
-            } else {
-                let v=v-n;
-                if !postorder(v,&mut self.vertex_info) {
-                    return false;
-                }
-            }
-        }
-        return true;
+    fn size(&self) -> usize {
+        return self.len();
     }
-    fn bfs<F1,Fd,F2,F3>(&mut self, start: usize, mut preorder: F1, mut adj_determine: Fd, mut inorder: F2, mut already: F3) -> bool where F1: FnMut(usize,&mut Vec::<usize>) -> bool, Fd: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F2: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool, F3: FnMut(usize,usize,usize,&mut Vec::<usize>) -> bool {
-        let n=self.size();
-        assert!(start<n);
-        let mut seen=vec![false;n];
-        seen[start]=true;
-        let mut queue=std::collections::VecDeque::new();
-        queue.push_back(start);
-        while let Some(v)=queue.pop_front() {
-            if !preorder(v,&mut self.vertex_info) {
-                return false;
-            }
-            for &(u,w) in &self.adj_list[v] {
-                if !adj_determine(v,u,w,&mut self.vertex_info) {
-                    continue;
-                }
-                if !seen[u] {
-                    seen[u]=true;
-                    queue.push_back(u);
-                    if !inorder(v,u,w,&mut self.vertex_info) {
-                        return false;
-                    }
-                } else {
-                    if !already(v,u,w,&mut self.vertex_info) {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
+    fn push(&mut self, a: usize, b: usize, w: usize) {
+        self[a].insert((b,w));
     }
 }
 
@@ -527,11 +381,11 @@ fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 w
 trait PrefixSum {
     /// 累積和のベクターを構築する関数
     fn construct_prefix_sum(array: &Self) -> Self;
-    /// 構築した累積和のベクターから部分和を計算する関数（0-indexedの閉区間）
+    /// 構築した累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
     fn calculate_partial_sum(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
 }
 
-impl<T> PrefixSum for Vec::<T> where T: Copy, T: std::ops::Add<Output=T>, T: std::ops::Sub<Output=T> {
+impl<T> PrefixSum for Vec<T> where T: Copy + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
     fn construct_prefix_sum(array: &Self) -> Self {
         let mut prefix_sum=vec![array[0]-array[0];array.len()+1];
         for i in 0..array.len() {
@@ -539,9 +393,9 @@ impl<T> PrefixSum for Vec::<T> where T: Copy, T: std::ops::Add<Output=T>, T: std
         }
         return prefix_sum;
     }
-    fn calculate_partial_sum(&self, l: usize, r: usize) -> <Self as std::ops::Index::<usize>>::Output {
-        assert!(l < self.len() && r < self.len());
-        return self[r+1]-self[l];
+    fn calculate_partial_sum(&self, l: usize, r: usize) -> <Self as std::ops::Index<usize>>::Output {
+        assert!(l < self.len() && r <= self.len());
+        return self[r]-self[l];
     }
 }
 
@@ -549,11 +403,11 @@ impl<T> PrefixSum for Vec::<T> where T: Copy, T: std::ops::Add<Output=T>, T: std
 trait TwoDPrefixSum {
     /// 2次元累積和のベクターを構築する関数
     fn construct_2d_prefix_sum(array: &Self) -> Self;
-    /// 構築した2次元累積和のベクターから部分和を計算する関数（0-indexedの閉区間）
-    fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <Self::Output as std::ops::Index::<usize>>::Output where Self: std::ops::Index::<usize>, Self::Output: std::ops::Index::<usize>;
+    /// 構築した2次元累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
+    fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <Self::Output as std::ops::Index<usize>>::Output where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize>;
 }
 
-impl<T> TwoDPrefixSum for Vec::<Vec::<T>> where T: Copy, T: std::ops::Add<Output=T>, T: std::ops::Sub<Output=T> {
+impl<T> TwoDPrefixSum for Vec<Vec<T>> where T: Copy + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
     fn construct_2d_prefix_sum(array: &Self) -> Self {
         let mut prefix_sum=vec![vec![array[0][0]-array[0][0];array[0].len()+1];array.len()+1];
         for i in 0..array.len() {
@@ -569,9 +423,9 @@ impl<T> TwoDPrefixSum for Vec::<Vec::<T>> where T: Copy, T: std::ops::Add<Output
         }
         return prefix_sum;
     }
-    fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <<Self as std::ops::Index::<usize>>::Output as std::ops::Index::<usize>>::Output {
-        assert!(l_i < self.len() && l_j < self[0].len() && r_i < self.len() && r_j < self[0].len());
-        return self[r_i+1][r_j+1]-self[r_i+1][l_j]-self[l_i][r_j+1]+self[l_i][l_j];
+    fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <<Self as std::ops::Index<usize>>::Output as std::ops::Index<usize>>::Output {
+        assert!(l_i < self.len() && l_j < self[0].len() && r_i <= self.len() && r_j <= self[0].len());
+        return self[r_i][r_j]-self[r_i][l_j]-self[l_i][r_j]+self[l_i][l_j];
     }
 }
 
