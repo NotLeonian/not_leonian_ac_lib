@@ -500,7 +500,7 @@ struct RevBinaryHeap<T> where T: Ord {
 impl<T> RevBinaryHeap<T> where T: Ord {
     #[allow(dead_code)]
     fn new() -> RevBinaryHeap<T> {
-        RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() }
+        return RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() };
     }
     #[allow(dead_code)]
     fn is_empty(&self) -> bool {
@@ -538,5 +538,17 @@ trait ToDecimal {
 impl ToDecimal for String {
     fn to_decimal(&self, radix: usize) -> usize {
         return usize::from_str_radix(&self, radix as u32).unwrap();
+    }
+}
+
+/// 2進法での桁数を求めるトレイト
+trait Blen {
+    /// 2進法での桁数を求める関数
+    fn blen(self) -> usize;
+}
+
+impl Blen for usize {
+    fn blen(self) -> usize {
+        return self.ilog2() as usize;
     }
 }
