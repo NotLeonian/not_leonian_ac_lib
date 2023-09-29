@@ -377,6 +377,78 @@ fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 w
     return ok;
 }
 
+// ModIntの逆元についてのトレイト
+trait ModIntInv where Self: Sized {
+    // 1～nからについてのModIntでの逆元をベクターで列挙する関数（最初の要素には便宜上1が入る）
+    fn construct_modint_inverses(n: usize) -> Vec<Self>;
+}
+
+impl<M> ModIntInv for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn construct_modint_inverses(n: usize) -> Vec<Self> {
+        assert!(M::HINT_VALUE_IS_PRIME);
+        let mut inv=vec![Self::raw(1);n+1];
+        for i in 2..=n {
+            inv[i]=-inv[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
+        }
+        return inv;
+    }
+}
+
+impl<I> ModIntInv for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn construct_modint_inverses(n: usize) -> Vec<Self> {
+        let mut invs=vec![Self::raw(1);n+1];
+        for i in 2..=n {
+            assert!(Self::modulus() as usize%i > 0);
+            invs[i]=-invs[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
+        }
+        return invs;
+    }
+}
+
+// ModIntの階乗についてのトレイト
+trait ModIntFact where Self: Sized {
+    // 1～nからについてのModIntでの階乗をベクターで列挙する関数
+    fn construct_modint_facts(n: usize) -> Vec<Self>;
+    // 1～nからについてのModIntでの階乗の逆元をベクターで列挙する関数
+    fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self>;
+}
+
+impl<M> ModIntFact for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn construct_modint_facts(n: usize) -> Vec<Self> {
+        let mut facts=vec![Self::raw(1);n+1];
+        for i in 2..=n {
+            facts[i]=facts[i-1]*i;
+        }
+        return facts;
+    }
+    fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self> {
+        assert!(invs.len() > n);
+        let mut factinvs=vec![Self::raw(1);n+1];
+        for i in 2..=n {
+            factinvs[i]=factinvs[i-1]*invs[i];
+        }
+        return factinvs;
+    }
+}
+
+impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn construct_modint_facts(n: usize) -> Vec<Self> {
+        let mut facts=vec![Self::raw(1);n+1];
+        for i in 2..=n {
+            facts[i]=facts[i-1]*i;
+        }
+        return facts;
+    }
+    fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self> {
+        assert!(invs.len() > n);
+        let mut factinvs=vec![Self::raw(1);n+1];
+        for i in 2..=n {
+            factinvs[i]=factinvs[i-1]*invs[i];
+        }
+        return factinvs;
+    }
+}
+
 /// 累積和についてのトレイト
 trait PrefixSum {
     /// 累積和のベクターを構築する関数
