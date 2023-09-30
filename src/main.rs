@@ -377,9 +377,9 @@ fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 w
     return ok;
 }
 
-// ModIntの逆元についてのトレイト
+/// ModIntの逆元についてのトレイト
 trait ModIntInv where Self: Sized {
-    // 1～nからについてのModIntでの逆元をベクターで列挙する関数（最初の要素には便宜上1が入る）
+    /// 1からnについてのModIntでの逆元をベクターで列挙する関数（最初の要素には便宜上1が入る）
     fn construct_modint_inverses(n: usize) -> Vec<Self>;
 }
 
@@ -405,11 +405,11 @@ impl<I> ModIntInv for ac_library::DynamicModInt<I> where I: ac_library::Id {
     }
 }
 
-// ModIntの階乗についてのトレイト
+/// ModIntの階乗についてのトレイト
 trait ModIntFact where Self: Sized {
-    // 1～nからについてのModIntでの階乗をベクターで列挙する関数
+    /// 1からnについてのModIntでの階乗をベクターで列挙する関数
     fn construct_modint_facts(n: usize) -> Vec<Self>;
-    // 1～nからについてのModIntでの階乗の逆元をベクターで列挙する関数
+    /// 1からnについてのModIntでの階乗の逆元をベクターで列挙する関数
     fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self>;
 }
 
@@ -501,6 +501,318 @@ impl<T> TwoDPrefixSum for Vec<Vec<T>> where T: Copy + std::ops::Add<Output=T> + 
     }
 }
 
+/// NTT素数のベクターで形式的冪級数を扱うトレイト
+trait FPS {
+    /// 和で上書きする関数
+    fn fps_add_assign(&mut self, g: &Self);
+    /// 和を返す関数
+    fn fps_add(f: &Self, g: &Self) -> Self;
+    /// 差で上書きする関数
+    fn fps_sub_assign(&mut self, g: &Self);
+    /// 差を返す関数
+    fn fps_sub(f: &Self, g: &Self) -> Self;
+    /// 定数倍で上書きする関数
+    fn fps_scalar_assign(&mut self, k: isize);
+    /// 定数倍を返す関数
+    fn fps_scalar(f: &Self, k: isize) -> Self;
+    /// 積で上書きする関数
+    fn fps_mul_assign(&mut self, g: &Self);
+    /// 積を返す関数
+    fn fps_mul(f: &Self, g: &Self) -> Self;
+    /// 逆元を返す関数
+    fn fps_inv(&self) -> Self;
+    /// 商で上書きする関数
+    fn fps_div_assign(&mut self, g: &Self);
+    /// 商を返す関数
+    fn fps_div(f: &Self, g: &Self) -> Self;
+    /// 導関数で上書きする関数
+    fn fps_diff_assign(&mut self);
+    /// 導関数を返す関数
+    fn fps_diff(f: &Self) -> Self;
+    /// 定積分で上書きする関数
+    fn fps_int_assign(&mut self);
+    /// 定積分を返す関数
+    fn fps_int(f: &Self) -> Self;
+    /// 対数で上書きする関数
+    fn fps_log_assign(&mut self);
+    /// 対数を返す関数
+    fn fps_log(f: &Self) -> Self;
+    /// 指数で上書きする関数
+    fn fps_exp_assign(&mut self);
+    /// 指数を返す関数
+    fn fps_exp(f: &Self) -> Self;
+    /// 冪で上書きする関数
+    fn fps_pow_assign(&mut self, k: usize);
+    /// 冪を返す関数
+    fn fps_pow(f: &Self, k: usize) -> Self;
+}
+
+impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
+    fn fps_add_assign(&mut self, g: &Self) {
+        assert!(self.len() == g.len());
+        let n=self.len()-1;
+        for i in 0..=n {
+            self[i]+=g[i];
+        }
+    }
+    fn fps_add(f: &Self, g: &Self) -> Self {
+        assert!(f.len() == g.len());
+        let mut h=f.clone();
+        h.fps_add_assign(&g);
+        return h;
+    }
+    fn fps_sub_assign(&mut self, g: &Self) {
+        assert!(self.len() == g.len());
+        let n=self.len()-1;
+        for i in 0..=n {
+            self[i]-=g[i];
+        }
+    }
+    fn fps_sub(f: &Self, g: &Self) -> Self {
+        assert!(f.len() == g.len());
+        let mut h=f.clone();
+        h.fps_sub_assign(&g);
+        return h;
+    }
+    fn fps_scalar_assign(&mut self, k: isize) {
+        let n=self.len()-1;
+        for i in 0..=n {
+            self[i]*=k;
+        }
+    }
+    fn fps_scalar(f: &Self, k: isize) -> Self {
+        let mut h=f.clone();
+        h.fps_scalar_assign(k);
+        return h;
+    }
+    fn fps_mul_assign(&mut self, g: &Self) {
+        assert!(self.len() == g.len());
+        let n=self.len()-1;
+        let h=FPS::fps_mul(self, g);
+        for i in 0..=n {
+            self[i]=h[i];
+        }
+    }
+    fn fps_mul(f: &Self, g: &Self) -> Self {
+        assert!(f.len() == g.len());
+        let n=f.len()-1;
+        return ac_library::convolution::convolution(&f[0..=n], &g[0..=n])[0..=n].to_vec();
+    }
+    fn fps_inv(&self) -> Self {
+        let n=self.len()-1;
+        let mut inv=vec![self[0].inv();1];
+        while inv.len()<=n {
+            inv.resize(std::cmp::min(inv.len()*2,n+1), ac_library::StaticModInt::<M>::raw(0));
+            let mut newinv=inv.clone();
+            newinv.fps_scalar_assign(2);
+            let mut selfclone=self.clone()[0..inv.len()].to_vec();
+            selfclone.fps_mul_assign(&inv);
+            selfclone.fps_mul_assign(&inv);
+            newinv.fps_sub_assign(&selfclone);
+            inv=newinv;
+        }
+        return inv;
+    }
+    fn fps_div_assign(&mut self, g: &Self) {
+        assert!(self.len() == g.len());
+        self.fps_mul_assign(&g.fps_inv());
+    }
+    fn fps_div(f: &Self, g: &Self) -> Self {
+        assert!(f.len() == g.len());
+        let mut h=f.clone();
+        h.fps_div_assign(&g);
+        return h;
+    }
+    fn fps_diff_assign(&mut self) {
+        let n=self.len()-1;
+        for i in 0..n {
+            self[i]=self[i+1]*(i+1);
+        }
+    }
+    fn fps_diff(f: &Self) -> Self {
+        let mut h=f.clone();
+        h.fps_diff_assign();
+        return h;
+    }
+    fn fps_int_assign(&mut self) {
+        let n=self.len()-1;
+        for i in (1..=n).rev() {
+            self[i]=self[i-1]/i;
+        }
+        self[0]=ac_library::StaticModInt::<M>::raw(0);
+    }
+    fn fps_int(f: &Self) -> Self {
+        let mut h=f.clone();
+        h.fps_int_assign();
+        return h;
+    }
+    fn fps_log_assign(&mut self) {
+        let n=self.len()-1;
+        let h=FPS::fps_log(self);
+        for i in 0..=n {
+            self[i]=h[i];
+        }
+    }
+    fn fps_log(f: &Self) -> Self {
+        let mut h=f.clone();
+        h.fps_diff_assign();
+        h.fps_div_assign(f);
+        h.fps_int_assign();
+        return h;
+    }
+    fn fps_exp_assign(&mut self) {
+        let n=self.len()-1;
+        let h=FPS::fps_exp(self);
+        for i in 0..=n {
+            self[i]=h[i];
+        }
+    }
+    fn fps_exp(f: &Self) -> Self {
+        assert!(f[0] == ac_library::StaticModInt::<M>::raw(0));
+        let n=f.len()-1;
+        let mut exp=vec![ac_library::StaticModInt::<M>::raw(1);1];
+        while exp.len()<=n {
+            exp.resize(std::cmp::min(exp.len()*2,n+1), ac_library::StaticModInt::<M>::raw(0));
+            let mut fclone=f[0..exp.len()].to_vec();
+            fclone.fps_sub_assign(&FPS::fps_log(&exp));
+            fclone[0]+=1;
+            exp.fps_mul_assign(&fclone);
+        }
+        return exp;
+    }
+    fn fps_pow_assign(&mut self, k: usize) {
+        let n=self.len()-1;
+        let mut lower=(ac_library::StaticModInt::<M>::raw(1),0);
+        for i in 0..=n {
+            if self[i]!=ac_library::StaticModInt::<M>::raw(0) {
+                lower=(self[i],i);
+                break;
+            }
+        }
+        for i in 0..=n-lower.1 {
+            self[i]=self[i+lower.1]/lower.0;
+        }
+        for i in n-lower.1+1..=n {
+            self[i]=ac_library::StaticModInt::<M>::raw(0);
+        }
+        self.fps_log_assign();
+        self.fps_scalar_assign(k as isize);
+        self.fps_exp_assign();
+        for i in (lower.1*k..=n).rev() {
+            self[i]=self[i-lower.1*k]*lower.0.pow(k as u64);
+        }
+        for i in 0..std::cmp::min(lower.1*k,n+1) {
+            self[i]=ac_library::StaticModInt::<M>::raw(0);
+        }
+    }
+    fn fps_pow(f: &Self, k: usize) -> Self {
+        let mut h=f.clone();
+        h.fps_pow_assign(k);
+        return h;
+    }
+}
+
+/// 最小値を取り出すことのできる優先度つきキューの構造体
+#[allow(dead_code)]
+struct RevBinaryHeap<T> where T: Ord {
+    binary_heap: std::collections::BinaryHeap<std::cmp::Reverse<T>>
+}
+
+impl<T> RevBinaryHeap<T> where T: Ord {
+    #[allow(dead_code)]
+    fn new() -> RevBinaryHeap<T> {
+        return RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() };
+    }
+    #[allow(dead_code)]
+    fn is_empty(&self) -> bool {
+        return self.binary_heap.is_empty();
+    }
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        return self.binary_heap.len();
+    }
+    #[allow(dead_code)]
+    fn push(&mut self, item: T) {
+        self.binary_heap.push(std::cmp::Reverse(item));
+    }
+    #[allow(dead_code)]
+    fn pop(&mut self) -> Option<T> {
+        if !self.is_empty() {
+            let std::cmp::Reverse(ret)=self.binary_heap.pop().unwrap();
+            return Some(ret);
+        } else {
+            return None;
+        }
+    }
+    #[allow(dead_code)]
+    fn clear(&mut self) {
+        self.binary_heap.clear();
+    }
+}
+
+/// 高速ゼータ変換および高速メビウス変換についてのトレイト
+trait ZetaMobius {
+    /// 上位集合についての高速ゼータ変換をする関数
+    fn zeta_superset_transform(&mut self);
+    /// 上位集合についての高速メビウス変換をする関数
+    fn mobius_superset_transform(&mut self);
+    /// 部分集合についての高速ゼータ変換をする関数
+    fn zeta_subset_transform(&mut self);
+    /// 部分集合についての高速メビウス変換をする関数
+    fn mobius_subset_transform(&mut self);
+}
+
+impl<T> ZetaMobius for Vec<T> where T: Copy + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
+    fn zeta_superset_transform(&mut self) {
+        let n=self.len();
+        let mut i=1;
+        while i<n {
+            for j in 0..n {
+                if j&i==0 {
+                    self[j]=self[j]+self[j|i];
+                }
+            }
+            i<<=1;
+        }
+    }
+    fn mobius_superset_transform(&mut self) {
+        let n=self.len();
+        let mut i=1;
+        while i<n {
+            for j in 0..n {
+                if j&i==0 {
+                    self[j]=self[j]-self[j|i];
+                }
+            }
+            i<<=1;
+        }
+    }
+    fn zeta_subset_transform(&mut self) {
+        let n=self.len();
+        let mut i=1;
+        while i<n {
+            for j in 0..n {
+                if j&i==0 {
+                    self[j|i]=self[j|i]+self[j];
+                }
+            }
+            i<<=1;
+        }
+    }
+    fn mobius_subset_transform(&mut self) {
+        let n=self.len();
+        let mut i=1;
+        while i<n {
+            for j in 0..n {
+                if j&i==0 {
+                    self[j|i]=self[j|i]-self[j];
+                }
+            }
+            i<<=1;
+        }
+    }
+}
+
 /// 単一の文字を数値に変換する関数のトレイト
 trait FromChar {
     /// 文字を数値に変換する関数（0-indexedの閉区間）
@@ -560,44 +872,6 @@ impl ToChar for usize {
     }
     fn to_lowercase(self) -> char {
         return self.to_foo('a', 26);
-    }
-}
-
-/// 最小値を取り出すことのできる優先度つきキューの構造体
-#[allow(dead_code)]
-struct RevBinaryHeap<T> where T: Ord {
-    binary_heap: std::collections::BinaryHeap<std::cmp::Reverse<T>>
-}
-
-impl<T> RevBinaryHeap<T> where T: Ord {
-    #[allow(dead_code)]
-    fn new() -> RevBinaryHeap<T> {
-        return RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() };
-    }
-    #[allow(dead_code)]
-    fn is_empty(&self) -> bool {
-        return self.binary_heap.is_empty();
-    }
-    #[allow(dead_code)]
-    fn len(&self) -> usize {
-        return self.binary_heap.len();
-    }
-    #[allow(dead_code)]
-    fn push(&mut self, item: T) {
-        self.binary_heap.push(std::cmp::Reverse(item));
-    }
-    #[allow(dead_code)]
-    fn pop(&mut self) -> Option<T> {
-        if !self.is_empty() {
-            let std::cmp::Reverse(ret)=self.binary_heap.pop().unwrap();
-            return Some(ret);
-        } else {
-            return None;
-        }
-    }
-    #[allow(dead_code)]
-    fn clear(&mut self) {
-        self.binary_heap.clear();
     }
 }
 
