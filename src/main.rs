@@ -309,6 +309,7 @@ trait Graph where Self: Sized {
         }
         return g;
     }
+    fn dijkstra(&self, start: usize) -> Vec<usize>;
 }
 
 impl Graph for Vec<Vec<(usize,usize)>> {
@@ -321,6 +322,24 @@ impl Graph for Vec<Vec<(usize,usize)>> {
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].push((b,w));
     }
+    fn dijkstra(&self, start: usize) -> Vec<usize> {
+        let mut dist=vec![usize::MAX;self.size()];
+        let mut pq=RevBinaryHeap::<(usize,usize)>::new();
+        dist[start]=0;
+        pq.push((dist[start],start));
+        while let Some((d,v))=pq.pop() {
+            if dist[v]<d {
+                continue;
+            }
+            for &(u,w) in &self[v] {
+                if dist[v]+w<dist[u] {
+                    dist[u]=dist[v]+w;
+                    pq.push((dist[u],u));
+                }
+            }
+        }
+        return dist;
+    }
 }
 
 impl Graph for Vec<std::collections::BTreeSet<(usize,usize)>> {
@@ -332,6 +351,24 @@ impl Graph for Vec<std::collections::BTreeSet<(usize,usize)>> {
     }
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].insert((b,w));
+    }
+    fn dijkstra(&self, start: usize) -> Vec<usize> {
+        let mut dist=vec![usize::MAX;self.size()];
+        let mut pq=RevBinaryHeap::<(usize,usize)>::new();
+        dist[start]=0;
+        pq.push((dist[start],start));
+        while let Some((d,v))=pq.pop() {
+            if dist[v]<d {
+                continue;
+            }
+            for &(u,w) in &self[v] {
+                if dist[v]+w<dist[u] {
+                    dist[u]=dist[v]+w;
+                    pq.push((dist[u],u));
+                }
+            }
+        }
+        return dist;
     }
 }
 
