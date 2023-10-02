@@ -744,16 +744,21 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     }
     fn fps_inv(&self) -> Self {
         let n=self.len()-1;
-        let mut inv=vec![self[0].inv();1];
-        while inv.len()<=n {
-            inv.resize(std::cmp::min(inv.len()*2,n+1), ac_library::StaticModInt::<M>::raw(0));
-            let mut newinv=inv.clone();
-            newinv.fps_scalar_assign(2);
-            let mut selfclone=self.clone()[0..inv.len()].to_vec();
-            selfclone.fps_mul_assign(&inv);
-            selfclone.fps_mul_assign(&inv);
-            newinv.fps_sub_assign(&selfclone);
-            inv=newinv;
+        let mut inv=vec![ac_library::StaticModInt::<M>::raw(0);n+1];
+        inv[0]=self[0].inv();
+        let mut curdeg=1;
+        while curdeg<=n {
+            curdeg*=2;
+            let mut f=self[0..std::cmp::min(curdeg,n+1)].to_vec();
+            let mut g=vec![ac_library::StaticModInt::<M>::raw(0);std::cmp::min(curdeg,n+1)];
+            for i in 0..curdeg/2 {
+                g[i]=inv[i];
+            }
+            f.fps_mul_assign(&g);
+            f.fps_mul_assign(&g);
+            for i in curdeg/2..std::cmp::min(curdeg,n+1) {
+                inv[i]-=f[i];
+            }
         }
         return inv;
     }
@@ -814,13 +819,18 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     fn fps_exp(f: &Self) -> Self {
         assert!(f[0] == ac_library::StaticModInt::<M>::raw(0));
         let n=f.len()-1;
-        let mut exp=vec![ac_library::StaticModInt::<M>::raw(1);1];
-        while exp.len()<=n {
-            exp.resize(std::cmp::min(exp.len()*2,n+1), ac_library::StaticModInt::<M>::raw(0));
-            let mut fclone=f[0..exp.len()].to_vec();
-            fclone.fps_sub_assign(&FPS::fps_log(&exp));
-            fclone[0]+=1;
-            exp.fps_mul_assign(&fclone);
+        let mut exp=vec![ac_library::StaticModInt::<M>::raw(0);n+1];
+        exp[0]=ac_library::StaticModInt::<M>::raw(1);
+        let mut curdeg=1;
+        while curdeg<=n {
+            curdeg*=2;
+            let mut fc=vec![ac_library::StaticModInt::<M>::raw(0);n+1];
+            for i in 0..std::cmp::min(curdeg,n+1) {
+                fc[i]=f[i];
+            }
+            fc.fps_sub_assign(&FPS::fps_log(&exp));
+            fc[0]+=1;
+            exp.fps_mul_assign(&fc);
         }
         return exp;
     }
