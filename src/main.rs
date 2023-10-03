@@ -97,14 +97,14 @@ impl Outputif for bool {
     }
 }
 
-/// 存在すれば値を、存在しなければ-1を出力する問題の1行を出力するトレイト
-trait Outputifexists {
+/// 存在すれば値を、存在しなければ-1を出力するトレイト
+trait OutputIfExists {
     /// 値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
-    fn outputifexists(self, max: Self);
+    fn output_if_exists(self, max: Self);
 }
 
-impl Outputifexists for usize {
-    fn outputifexists(self, max: Self) {
+impl OutputIfExists for usize {
+    fn output_if_exists(self, max: Self) {
         if self<max {
             println!("{}",self);
         } else {
@@ -415,8 +415,8 @@ trait Graph where Self: Sized {
         }
         return g;
     }
-    /// ダイクストラ法の関数
-    fn dijkstra(&self, start: usize) -> Vec<usize>;
+    /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）
+    fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
 }
 
 impl Graph for Vec<Vec<(usize,usize)>> {
@@ -429,19 +429,36 @@ impl Graph for Vec<Vec<(usize,usize)>> {
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].push((b,w));
     }
-    fn dijkstra(&self, start: usize) -> Vec<usize> {
+    fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
         let mut dist=vec![usize::MAX;self.size()];
-        let mut pq=RevBinaryHeap::<(usize,usize)>::new();
         dist[start]=0;
-        pq.push((dist[start],start));
-        while let Some((d,v))=pq.pop() {
-            if dist[v]<d {
-                continue;
+        if is_weighted {
+            let mut pq=RevBinaryHeap::<(usize,usize)>::new();
+            pq.push((dist[start],start));
+            while let Some((d,v))=pq.pop() {
+                if dist[v]<d {
+                    continue;
+                }
+                for &(u,w) in &self[v] {
+                    if dist[v]+w<dist[u] {
+                        dist[u]=dist[v]+w;
+                        pq.push((dist[u],u));
+                    }
+                }
             }
-            for &(u,w) in &self[v] {
-                if dist[v]+w<dist[u] {
-                    dist[u]=dist[v]+w;
-                    pq.push((dist[u],u));
+        } else {
+            let mut seen=vec![false;self.size()];
+            seen[0]=true;
+            let mut queue=std::collections::VecDeque::<usize>::new();
+            queue.push_back(0);
+            while let Some(v)=queue.pop_front() {
+                for &(u,w) in &self[v] {
+                    assert!(w==1);
+                    if !seen[u] {
+                        dist[u]=dist[v]+w;
+                        seen[u]=true;
+                        queue.push_back(u);
+                    }
                 }
             }
         }
@@ -459,19 +476,36 @@ impl Graph for Vec<std::collections::BTreeSet<(usize,usize)>> {
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].insert((b,w));
     }
-    fn dijkstra(&self, start: usize) -> Vec<usize> {
+    fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
         let mut dist=vec![usize::MAX;self.size()];
-        let mut pq=RevBinaryHeap::<(usize,usize)>::new();
         dist[start]=0;
-        pq.push((dist[start],start));
-        while let Some((d,v))=pq.pop() {
-            if dist[v]<d {
-                continue;
+        if is_weighted {
+            let mut pq=RevBinaryHeap::<(usize,usize)>::new();
+            pq.push((dist[start],start));
+            while let Some((d,v))=pq.pop() {
+                if dist[v]<d {
+                    continue;
+                }
+                for &(u,w) in &self[v] {
+                    if dist[v]+w<dist[u] {
+                        dist[u]=dist[v]+w;
+                        pq.push((dist[u],u));
+                    }
+                }
             }
-            for &(u,w) in &self[v] {
-                if dist[v]+w<dist[u] {
-                    dist[u]=dist[v]+w;
-                    pq.push((dist[u],u));
+        } else {
+            let mut seen=vec![false;self.size()];
+            seen[0]=true;
+            let mut queue=std::collections::VecDeque::<usize>::new();
+            queue.push_back(0);
+            while let Some(v)=queue.pop_front() {
+                for &(u,w) in &self[v] {
+                    assert!(w==1);
+                    if !seen[u] {
+                        dist[u]=dist[v]+w;
+                        seen[u]=true;
+                        queue.push_back(u);
+                    }
                 }
             }
         }
@@ -523,7 +557,7 @@ fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 w
 
 /// ModIntの逆元についてのトレイト
 trait ModIntInv where Self: Sized {
-    /// 1からnについてのModIntでの逆元をベクターで列挙する関数（最初の要素には便宜上1が入る）
+    /// 1からnについてのModIntでの逆元をベクターで列挙する関数（最初の要素には0が入る）
     fn construct_modint_inverses(n: usize) -> Vec<Self>;
 }
 
@@ -534,6 +568,7 @@ impl<M> ModIntInv for ac_library::StaticModInt<M> where M: ac_library::Modulus {
         for i in 2..=n {
             inv[i]=-inv[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
         }
+        inv[0]=Self::raw(0);
         return inv;
     }
 }
@@ -645,49 +680,180 @@ impl<T> TwoDPrefixSum for Vec<Vec<T>> where T: Clone + std::ops::Add<Output=T> +
     }
 }
 
+// 素数に関するトレイト
+trait Primes where Self: Sized {
+    // 素数か判定する関数
+    fn is_prime(self) -> bool;
+    // 素数冪か判定する関数
+    fn is_prime_power(self) -> bool;
+    // 約数を列挙する関数
+    fn enumerate_divisors(self) -> Vec<Self>;
+    // 素因数分解をする関数
+    fn prime_factorize(self) -> Vec<(Self,Self)>;
+    // ルジャンドルの定理でselfの階乗がpで何回割り切れるかを計算する関数
+    fn legendre_s_formula(self, p: usize) -> usize;
+    // エラトステネスの篩で素数を列挙する関数
+    fn sieve_of_eratosthenes(nmax: Self) -> Vec<bool>;
+    // 線形篩で最小素因数を列挙する関数
+    fn linear_sieve(nmax: Self) -> Vec<Self>;
+    // 線形篩を用いて素因数分解をする関数
+    fn fast_prime_factorize(self, linear_sieve: &Vec<Self>) -> Vec<(Self,Self)>;
+}
+
+impl Primes for usize {
+    fn is_prime(self) -> bool {
+        for i in 2..=num_integer::sqrt(self) {
+            if self%i==0 {
+                return false;
+            }
+        }
+        return true;
+    }
+    fn is_prime_power(mut self) -> bool {
+        for i in 2..=num_integer::sqrt(self) {
+            if self%i==0 {
+                while self%i==0 {
+                    self/=i;
+                }
+                return self==1;
+            }
+        }
+        return true;
+    }
+    fn enumerate_divisors(self) -> Vec<Self> {
+        let mut divs=Vec::<Self>::new();
+        let mut high=Vec::<Self>::new();
+        for i in 1..=num_integer::sqrt(self) {
+            if self%i==0 {
+                divs.push(i);
+                if self/i!=i {
+                    high.push(self/i);
+                }
+            }
+        }
+        while let Some(i)=high.pop() {
+            divs.push(i);
+        }
+        return divs;
+    }
+    fn prime_factorize(mut self) -> Vec<(Self,Self)> {
+        let mut pes=Vec::<(Self,Self)>::new();
+        for i in 2..=num_integer::sqrt(self) {
+            if self%i==0 {
+                let mut e=0;
+                while self%i==0 {
+                    e+=1;
+                    self/=i;
+                }
+                pes.push((i,e));
+            }
+        }
+        if self>1 {
+            pes.push((self,1));
+        }
+        return pes;
+    }
+    fn legendre_s_formula(mut self, p: usize) -> usize {
+        let mut e=0;
+        while self>0 {
+            e+=self/p;
+            self/=p;
+        }
+        return e;
+    }
+    fn sieve_of_eratosthenes(nmax: Self) -> Vec<bool> {
+        let mut is_prime=vec![true;nmax+1];
+        is_prime[0]=false;
+        is_prime[1]=false;
+        for i in 2..=nmax {
+            if is_prime[i] {
+                for j in 2..=nmax/i {
+                    is_prime[i*j]=false;
+                }
+            }
+        }
+        return is_prime;
+    }
+    fn linear_sieve(nmax: Self) -> Vec<Self> {
+        let mut lpf=vec![0;nmax+1];
+        let mut primes=Vec::<Self>::new();
+        for i in 2..=nmax {
+            if lpf[i]==0 {
+                lpf[i]=i;
+                primes.push(i);
+            }
+            for &p in &primes {
+                if p*i>nmax || p>lpf[i] {
+                    break;
+                }
+                lpf[p*i]=p;
+            }
+        }
+        return lpf;
+    }
+    fn fast_prime_factorize(mut self, linear_sieve: &Vec<Self>) -> Vec<(Self,Self)> {
+        assert!(linear_sieve.len() > self);
+        let mut pes=Vec::<(Self,Self)>::new();
+        let mut p=linear_sieve[self];
+        let mut e=0;
+        while self>1 {
+            if p==linear_sieve[self] {
+                e+=1;
+            } else {
+                pes.push((p,e));
+                p=linear_sieve[self];
+                e=1;
+            }
+            self/=linear_sieve[self];
+        }
+        pes.push((p,e));
+        return pes;
+    }
+}
+
 /// NTT素数のベクターで形式的冪級数を扱うトレイト
 trait FPS {
-    /// 和で上書きする関数
+    /// 形式的冪級数の和を割り当てる関数
     fn fps_add_assign(&mut self, g: &Self);
-    /// 和を返す関数
+    /// 形式的冪級数の和を返す関数
     fn fps_add(f: &Self, g: &Self) -> Self;
-    /// 差で上書きする関数
+    /// 形式的冪級数の差を割り当てる関数
     fn fps_sub_assign(&mut self, g: &Self);
-    /// 差を返す関数
+    /// 形式的冪級数の差を返す関数
     fn fps_sub(f: &Self, g: &Self) -> Self;
-    /// 定数倍で上書きする関数
+    /// 形式的冪級数の定数倍を割り当てる関数
     fn fps_scalar_assign(&mut self, k: isize);
-    /// 定数倍を返す関数
+    /// 形式的冪級数の定数倍を返す関数
     fn fps_scalar(f: &Self, k: isize) -> Self;
-    /// 積で上書きする関数
+    /// 形式的冪級数の積を割り当てる関数
     fn fps_mul_assign(&mut self, g: &Self);
-    /// 積を返す関数
+    /// 形式的冪級数の積を返す関数
     fn fps_mul(f: &Self, g: &Self) -> Self;
-    /// 逆元を返す関数
+    /// 形式的冪級数の逆元を返す関数
     fn fps_inv(&self) -> Self;
-    /// 商で上書きする関数
+    /// 形式的冪級数の商を割り当てる関数
     fn fps_div_assign(&mut self, g: &Self);
-    /// 商を返す関数
+    /// 形式的冪級数の商を返す関数
     fn fps_div(f: &Self, g: &Self) -> Self;
-    /// 導関数で上書きする関数
+    /// 形式的冪級数の導関数を割り当てる関数
     fn fps_diff_assign(&mut self);
-    /// 導関数を返す関数
+    /// 形式的冪級数の導関数を返す関数
     fn fps_diff(f: &Self) -> Self;
-    /// 定積分で上書きする関数
+    /// 形式的冪級数の定積分を割り当てる関数
     fn fps_int_assign(&mut self);
-    /// 定積分を返す関数
+    /// 形式的冪級数の定積分を返す関数
     fn fps_int(f: &Self) -> Self;
-    /// 対数で上書きする関数
+    /// 形式的冪級数の対数を割り当てる関数
     fn fps_log_assign(&mut self);
-    /// 対数を返す関数
+    /// 形式的冪級数の対数を返す関数
     fn fps_log(f: &Self) -> Self;
-    /// 指数で上書きする関数
+    /// 形式的冪級数の指数を割り当てる関数
     fn fps_exp_assign(&mut self);
-    /// 指数を返す関数
+    /// 形式的冪級数の指数を返す関数
     fn fps_exp(f: &Self) -> Self;
-    /// 冪で上書きする関数
+    /// 形式的冪級数の冪を割り当てる関数
     fn fps_pow_assign(&mut self, k: usize);
-    /// 冪を返す関数
+    /// 形式的冪級数の冪を返す関数
     fn fps_pow(f: &Self, k: usize) -> Self;
 }
 
