@@ -45,7 +45,7 @@ impl<T> Outputln for Vec<T> where T: std::fmt::Display {
 impl<T, const N: usize> Outputln for [T;N] where T: Sized + std::fmt::Display {
     fn outputln(&self) {
         for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
+            if i<N-1 {
                 print!("{} ",&var);
             } else {
                 println!("{}",&var);
@@ -98,13 +98,13 @@ impl Outputif for bool {
 }
 
 /// 存在すれば値を、存在しなければ-1を出力するトレイト
-trait OutputIfExists {
+trait OutputExistence {
     /// 値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
-    fn output_if_exists(self, max: Self);
+    fn output_existence(self, max: Self);
 }
 
-impl OutputIfExists for usize {
-    fn output_if_exists(self, max: Self) {
+impl OutputExistence for usize {
+    fn output_existence(self, max: Self) {
         if self<max {
             println!("{}",self);
         } else {
@@ -138,28 +138,16 @@ fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N
     return (begin..end).map(|i| func(i)).collect::<Vec::<T>>();
 }
 
-/// isizeをusizeにキャストするトレイト
+/// usizeにキャストするトレイト
 trait Usize {
-    /// isizeをusizeにキャストする関数
+    /// usizeにキャストする関数
     fn usize(self) -> usize;
 }
 
-impl Usize for isize {
-    fn usize(self) -> usize {
-        self as usize
-    }
-}
-
-/// usizeをisizeにキャストするトレイト
+/// isizeにキャストするトレイト
 trait Isize {
-    /// usizeをisizeにキャストする関数
+    /// isizeにキャストする関数
     fn isize(self) -> isize;
-}
-
-impl Isize for usize {
-    fn isize(self) -> isize {
-        self as isize
-    }
 }
 
 /// max関数
@@ -555,55 +543,131 @@ fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 w
     return ok;
 }
 
+/// 最小値を取り出すことのできる優先度つきキューの構造体
+#[allow(dead_code)]
+#[derive(Clone, Default, std::fmt::Debug)]
+struct RevBinaryHeap<T> where T: Ord {
+    binary_heap: std::collections::BinaryHeap<std::cmp::Reverse<T>>
+}
+
+impl<T> RevBinaryHeap<T> where T: Ord {
+    #[allow(dead_code)]
+    fn new() -> RevBinaryHeap<T> {
+        return RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() };
+    }
+    #[allow(dead_code)]
+    fn is_empty(&self) -> bool {
+        return self.binary_heap.is_empty();
+    }
+    #[allow(dead_code)]
+    fn len(&self) -> usize {
+        return self.binary_heap.len();
+    }
+    #[allow(dead_code)]
+    fn push(&mut self, item: T) {
+        self.binary_heap.push(std::cmp::Reverse(item));
+    }
+    #[allow(dead_code)]
+    fn pop(&mut self) -> Option<T> {
+        if !self.is_empty() {
+            let std::cmp::Reverse(ret)=self.binary_heap.pop().unwrap();
+            return Some(ret);
+        } else {
+            return None;
+        }
+    }
+    #[allow(dead_code)]
+    fn clear(&mut self) {
+        self.binary_heap.clear();
+    }
+}
+
+/// 0(加法単位元)を定義するトレイト
+trait Zero {
+    /// 0(加法単位元)を返す関数
+    fn zero_val() -> Self;
+}
+
+impl<M> Zero for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn zero_val() -> Self {
+        return Self::new(0);
+    }
+}
+
+impl<I> Zero for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn zero_val() -> Self {
+        return Self::new(0);
+    }
+}
+
+/// 1(乗法単位元)を定義するトレイト
+trait One {
+    /// 1(乗法単位元)を返す関数
+    fn one_val() -> Self;
+}
+
+impl<M> One for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn one_val() -> Self {
+        return Self::new(1);
+    }
+}
+
+impl<I> One for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn one_val() -> Self {
+        return Self::new(1);
+    }
+}
+
 /// ModIntの逆元についてのトレイト
 trait ModIntInv where Self: Sized {
-    /// 1からnについてのModIntでの逆元をベクターで列挙する関数（最初の要素には0が入る）
-    fn construct_modint_inverses(n: usize) -> Vec<Self>;
+    /// ModIntの逆元をベクターで列挙する関数（最初の要素には0が入る）
+    fn construct_modint_inverses(nmax: usize) -> Vec<Self>;
 }
 
 impl<M> ModIntInv for ac_library::StaticModInt<M> where M: ac_library::Modulus {
-    fn construct_modint_inverses(n: usize) -> Vec<Self> {
+    fn construct_modint_inverses(nmax: usize) -> Vec<Self> {
         assert!(M::HINT_VALUE_IS_PRIME);
-        let mut inv=vec![Self::raw(1);n+1];
-        for i in 2..=n {
-            inv[i]=-inv[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
+        let mut invs=vec![Self::new(1);nmax+1];
+        for i in 2..=nmax {
+            invs[i]=-invs[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
         }
-        inv[0]=Self::raw(0);
-        return inv;
+        invs[0]=Self::new(0);
+        return invs;
     }
 }
 
 impl<I> ModIntInv for ac_library::DynamicModInt<I> where I: ac_library::Id {
-    fn construct_modint_inverses(n: usize) -> Vec<Self> {
-        let mut invs=vec![Self::raw(1);n+1];
-        for i in 2..=n {
+    fn construct_modint_inverses(nmax: usize) -> Vec<Self> {
+        let mut invs=vec![Self::new(1);nmax+1];
+        for i in 2..=nmax {
             assert!(Self::modulus() as usize%i > 0);
             invs[i]=-invs[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
         }
+        invs[0]=Self::new(0);
         return invs;
     }
 }
 
 /// ModIntの階乗についてのトレイト
 trait ModIntFact where Self: Sized {
-    /// 1からnについてのModIntでの階乗をベクターで列挙する関数
-    fn construct_modint_facts(n: usize) -> Vec<Self>;
-    /// 1からnについてのModIntでの階乗の逆元をベクターで列挙する関数
-    fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self>;
+    /// ModIntの階乗をベクターで列挙する関数
+    fn construct_modint_facts(nmax: usize) -> Vec<Self>;
+    /// ModIntの階乗の逆元をベクターで列挙する関数
+    fn construct_modint_fact_inverses(nmax: usize, invs: &Vec<Self>) -> Vec<Self>;
 }
 
 impl<M> ModIntFact for ac_library::StaticModInt<M> where M: ac_library::Modulus {
-    fn construct_modint_facts(n: usize) -> Vec<Self> {
-        let mut facts=vec![Self::raw(1);n+1];
-        for i in 2..=n {
+    fn construct_modint_facts(nmax: usize) -> Vec<Self> {
+        let mut facts=vec![Self::new(1);nmax+1];
+        for i in 2..=nmax {
             facts[i]=facts[i-1]*i;
         }
         return facts;
     }
-    fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self> {
-        assert!(invs.len() > n);
-        let mut factinvs=vec![Self::raw(1);n+1];
-        for i in 2..=n {
+    fn construct_modint_fact_inverses(nmax: usize, invs: &Vec<Self>) -> Vec<Self> {
+        assert!(invs.len() > nmax);
+        let mut factinvs=vec![Self::new(1);nmax+1];
+        for i in 2..=nmax {
             factinvs[i]=factinvs[i-1]*invs[i];
         }
         return factinvs;
@@ -611,17 +675,17 @@ impl<M> ModIntFact for ac_library::StaticModInt<M> where M: ac_library::Modulus 
 }
 
 impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
-    fn construct_modint_facts(n: usize) -> Vec<Self> {
-        let mut facts=vec![Self::raw(1);n+1];
-        for i in 2..=n {
+    fn construct_modint_facts(nmax: usize) -> Vec<Self> {
+        let mut facts=vec![Self::new(1);nmax+1];
+        for i in 2..=nmax {
             facts[i]=facts[i-1]*i;
         }
         return facts;
     }
-    fn construct_modint_fact_inverses(n: usize, invs: &Vec<Self>) -> Vec<Self> {
-        assert!(invs.len() > n);
-        let mut factinvs=vec![Self::raw(1);n+1];
-        for i in 2..=n {
+    fn construct_modint_fact_inverses(nmax: usize, invs: &Vec<Self>) -> Vec<Self> {
+        assert!(invs.len() > nmax);
+        let mut factinvs=vec![Self::new(1);nmax+1];
+        for i in 2..=nmax {
             factinvs[i]=factinvs[i-1]*invs[i];
         }
         return factinvs;
@@ -636,9 +700,9 @@ trait PrefixSum {
     fn calculate_partial_sum(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
 }
 
-impl<T> PrefixSum for Vec<T> where T: Clone + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
+impl<T> PrefixSum for Vec<T> where T: Clone + Zero + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
     fn construct_prefix_sum(array: &Self) -> Self {
-        let mut prefix_sum=vec![array[0].clone()-array[0].clone();array.len()+1];
+        let mut prefix_sum=vec![T::zero_val();array.len()+1];
         for i in 0..array.len() {
             prefix_sum[i+1]=prefix_sum[i].clone()+array[i].clone();
         }
@@ -651,16 +715,16 @@ impl<T> PrefixSum for Vec<T> where T: Clone + std::ops::Add<Output=T> + std::ops
 }
 
 /// 2次元累積和についてのトレイト
-trait TwoDPrefixSum {
+trait TwoDimPrefixSum {
     /// 2次元累積和のベクターを構築する関数
     fn construct_2d_prefix_sum(array: &Self) -> Self;
     /// 構築した2次元累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
     fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <Self::Output as std::ops::Index<usize>>::Output where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize>;
 }
 
-impl<T> TwoDPrefixSum for Vec<Vec<T>> where T: Clone + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
+impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + Zero + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
     fn construct_2d_prefix_sum(array: &Self) -> Self {
-        let mut prefix_sum=vec![vec![array[0][0].clone()-array[0][0].clone();array[0].len()+1];array.len()+1];
+        let mut prefix_sum=vec![vec![T::zero_val();array[0].len()+1];array.len()+1];
         for i in 0..array.len() {
             assert!(array[i].len()==array[0].len());
             for j in 0..array[0].len() {
@@ -680,23 +744,23 @@ impl<T> TwoDPrefixSum for Vec<Vec<T>> where T: Clone + std::ops::Add<Output=T> +
     }
 }
 
-// 素数に関するトレイト
+/// 素数に関するトレイト
 trait Primes where Self: Sized {
-    // 素数か判定する関数
+    /// 素数か判定する関数
     fn is_prime(self) -> bool;
-    // 素数冪か判定する関数
+    /// 素数冪か判定する関数
     fn is_prime_power(self) -> bool;
-    // 約数を列挙する関数
+    /// 約数を列挙する関数
     fn enumerate_divisors(self) -> Vec<Self>;
-    // 素因数分解をする関数
+    /// 素因数分解をする関数
     fn prime_factorize(self) -> Vec<(Self,Self)>;
-    // ルジャンドルの定理でselfの階乗がpで何回割り切れるかを計算する関数
+    /// ルジャンドルの定理でselfの階乗がpで何回割り切れるかを計算する関数
     fn legendre_s_formula(self, p: usize) -> usize;
-    // エラトステネスの篩で素数を列挙する関数
+    /// エラトステネスの篩で素数を列挙する関数
     fn sieve_of_eratosthenes(nmax: Self) -> Vec<bool>;
-    // 線形篩で最小素因数を列挙する関数
+    /// 線形篩で最小素因数を列挙する関数
     fn linear_sieve(nmax: Self) -> Vec<Self>;
-    // 線形篩を用いて素因数分解をする関数
+    /// 線形篩を用いて素因数分解をする関数
     fn fast_prime_factorize(self, linear_sieve: &Vec<Self>) -> Vec<(Self,Self)>;
 }
 
@@ -811,6 +875,190 @@ impl Primes for usize {
     }
 }
 
+/// N1×N2行列の構造体
+#[derive(Clone, std::fmt::Debug)]
+struct Matrix<T, const N1: usize, const N2: usize> {
+    matrix: [[T;N2];N1]
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::Deref for Matrix<T,N1,N2> {
+    type Target = [[T;N2];N1];
+    fn deref(&self) -> &Self::Target {
+        return &self.matrix;
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::DerefMut for Matrix<T,N1,N2> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        return &mut self.matrix;
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> PartialEq for Matrix<T,N1,N2> where T: PartialEq {
+    fn eq(&self, other: &Self) -> bool {
+        let mut ret=true;
+        for i in 0..N1 {
+            for j in 0..N2 {
+                if self[i][j]!=other[i][j] {
+                    ret=false;
+                }
+            }
+        }
+        return ret;
+    }
+    fn ne(&self, other: &Self) -> bool {
+        return !self.eq(other);
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> Zero for Matrix<T,N1,N2> where T: Copy + Zero {
+    fn zero_val() -> Self {
+        return Self {
+            matrix: [[T::zero_val();N2];N1]
+        };
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> num::Zero for Matrix<T,N1,N2> where T: Copy + Zero + std::ops::Add<Output=T> + PartialEq {
+    fn zero() -> Self {
+        return Self::zero_val();
+    }
+    fn is_zero(&self) -> bool {
+        return *self==Self::zero();
+    }
+}
+
+impl<T, const N: usize> One for Matrix<T,N,N> where T: Copy + Zero + One {
+    fn one_val() -> Self {
+        let mut matrix=Self::zero_val();
+        for i in 0..N {
+            matrix[i][i]=T::one_val();
+        }
+        return matrix;
+    }
+}
+
+impl<T, const N: usize> num::One for Matrix<T,N,N> where T: Copy + Zero + One + std::ops::AddAssign + std::ops::Mul<Output=T> + PartialEq {
+    fn one() -> Self {
+        return Self::one_val();
+    }
+    fn is_one(&self) -> bool {
+        return *self==Self::one();
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::AddAssign for Matrix<T,N1,N2> where T: Clone + std::ops::AddAssign {
+    fn add_assign(&mut self, rhs: Self) {
+        for i in 0..N1 {
+            for j in 0..N2 {
+                self[i][j]+=rhs[i][j].clone();
+            }
+        }
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::Add for Matrix<T,N1,N2> where T: Clone + std::ops::Add<Output=T> {
+    type Output = Self;
+    fn add(mut self, rhs: Self) -> Self::Output {
+        for i in 0..N1 {
+            for j in 0..N2 {
+                self[i][j]=self[i][j].clone()+rhs[i][j].clone();
+            }
+        }
+        return self;
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::Neg for Matrix<T,N1,N2> where T: Clone + std::ops::Neg<Output=T> {
+    type Output = Self;
+    fn neg(mut self) -> Self::Output {
+        for i in 0..N1 {
+            for j in 0..N2 {
+                self[i][j]=-self[i][j].clone();
+            }
+        }
+        return self;
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::SubAssign for Matrix<T,N1,N2> where T: Clone + std::ops::SubAssign {
+    fn sub_assign(&mut self, rhs: Self) {
+        for i in 0..N1 {
+            for j in 0..N2 {
+                self[i][j]-=rhs[i][j].clone();
+            }
+        }
+    }
+}
+
+impl<T, const N1: usize, const N2: usize> std::ops::Sub for Matrix<T,N1,N2> where T: Clone + std::ops::Sub<Output=T> {
+    type Output = Self;
+    fn sub(mut self, rhs: Self) -> Self::Output {
+        for i in 0..N1 {
+            for j in 0..N2 {
+                self[i][j]=self[i][j].clone()-rhs[i][j].clone();
+            }
+        }
+        return self;
+    }
+}
+
+impl<T, const N: usize> std::ops::MulAssign for Matrix<T,N,N> where T: Copy + Zero + std::ops::AddAssign + std::ops::Mul<Output=T> {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self=self.clone()*rhs;
+    }
+}
+
+impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<T,N2,N3>> for Matrix<T,N1,N2> where T: Copy + Zero + std::ops::AddAssign + std::ops::Mul<Output=T> {
+    type Output = Matrix<T,N1,N3>;
+    fn mul(self, rhs: Matrix<T,N2,N3>) -> Self::Output {
+        let mut prod=Self::Output::zero_val();
+        for i in 0..N1 {
+            for j in 0..N3 {
+                for k in 0..N2 {
+                    prod[i][j]+=self[i][k].clone()*rhs[k][j].clone();
+                }
+            }
+        }
+        return prod;
+    }
+}
+
+/// ダブリングのトレイト
+trait Doubling where Self: Sized + std::ops::Index<usize>, Self::Output: std::ops::Index<usize> {
+    /// ダブリングの前計算を行う関数
+    fn precompute(to: &Self::Output, cntmax: usize) -> Self;
+    /// ダブリングのDPテーブルをもとにstartからcnt回移動した先を返す関数（0-indexed）
+    fn doubling_answer(&self, start: usize, cnt: usize) -> <Self::Output as std::ops::Index<usize>>::Output;
+}
+
+impl Doubling for Vec<Vec<usize>> {
+    fn precompute(to: &Vec<usize>, cntmax: usize) -> Self {
+        let log=cntmax.ilog2() as usize+1;
+        let mut doubling=vec![vec![0;log];to.len()];
+        for i in 0..to.len() {
+            doubling[i][0]=to[i];
+        }
+        for k in 0..log-1 {
+            for i in 0..to.len() {
+                doubling[i][k+1]=doubling[doubling[i][k]][k];
+            }
+        }
+        return doubling;
+    }
+    fn doubling_answer(&self, mut start: usize, mut cnt: usize) -> <Self::Output as std::ops::Index<usize>>::Output {
+        let mut k=0;
+        while cnt>0 {
+            if (cnt&1)>0 {
+                start=self[start][k];
+            }
+            cnt/=2;
+            k+=1;
+        }
+        return start;
+    }
+}
+
 /// NTT素数のベクターで形式的冪級数を扱うトレイト
 trait FPS {
     /// 形式的冪級数の和を割り当てる関数
@@ -910,13 +1158,13 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     }
     fn fps_inv(&self) -> Self {
         let n=self.len()-1;
-        let mut inv=vec![ac_library::StaticModInt::<M>::raw(0);n+1];
+        let mut inv=vec![ac_library::StaticModInt::<M>::new(0);n+1];
         inv[0]=self[0].inv();
         let mut curdeg=1;
         while curdeg<=n {
             curdeg*=2;
             let mut f=self[0..std::cmp::min(curdeg,n+1)].to_vec();
-            let mut g=vec![ac_library::StaticModInt::<M>::raw(0);std::cmp::min(curdeg,n+1)];
+            let mut g=vec![ac_library::StaticModInt::<M>::new(0);std::cmp::min(curdeg,n+1)];
             for i in 0..curdeg/2 {
                 g[i]=inv[i];
             }
@@ -954,7 +1202,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         for i in (1..=n).rev() {
             self[i]=self[i-1]/i;
         }
-        self[0]=ac_library::StaticModInt::<M>::raw(0);
+        self[0]=ac_library::StaticModInt::<M>::new(0);
     }
     fn fps_int(f: &Self) -> Self {
         let mut h=f.clone();
@@ -983,14 +1231,14 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         }
     }
     fn fps_exp(f: &Self) -> Self {
-        assert!(f[0] == ac_library::StaticModInt::<M>::raw(0));
+        assert!(f[0] == ac_library::StaticModInt::<M>::new(0));
         let n=f.len()-1;
-        let mut exp=vec![ac_library::StaticModInt::<M>::raw(0);n+1];
-        exp[0]=ac_library::StaticModInt::<M>::raw(1);
+        let mut exp=vec![ac_library::StaticModInt::<M>::new(0);n+1];
+        exp[0]=ac_library::StaticModInt::<M>::new(1);
         let mut curdeg=1;
         while curdeg<=n {
             curdeg*=2;
-            let mut fc=vec![ac_library::StaticModInt::<M>::raw(0);n+1];
+            let mut fc=vec![ac_library::StaticModInt::<M>::new(0);n+1];
             for i in 0..std::cmp::min(curdeg,n+1) {
                 fc[i]=f[i];
             }
@@ -1002,9 +1250,9 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     }
     fn fps_pow_assign(&mut self, k: usize) {
         let n=self.len()-1;
-        let mut lower=(ac_library::StaticModInt::<M>::raw(1),0);
+        let mut lower=(ac_library::StaticModInt::<M>::new(1),0);
         for i in 0..=n {
-            if self[i]!=ac_library::StaticModInt::<M>::raw(0) {
+            if self[i]!=ac_library::StaticModInt::<M>::new(0) {
                 lower=(self[i],i);
                 break;
             }
@@ -1013,7 +1261,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]=self[i+lower.1]/lower.0;
         }
         for i in n-lower.1+1..=n {
-            self[i]=ac_library::StaticModInt::<M>::raw(0);
+            self[i]=ac_library::StaticModInt::<M>::new(0);
         }
         self.fps_log_assign();
         self.fps_scalar_assign(k as isize);
@@ -1022,52 +1270,13 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]=self[i-lower.1*k]*lower.0.pow(k as u64);
         }
         for i in 0..std::cmp::min(lower.1*k,n+1) {
-            self[i]=ac_library::StaticModInt::<M>::raw(0);
+            self[i]=ac_library::StaticModInt::<M>::new(0);
         }
     }
     fn fps_pow(f: &Self, k: usize) -> Self {
         let mut h=f.clone();
         h.fps_pow_assign(k);
         return h;
-    }
-}
-
-/// 最小値を取り出すことのできる優先度つきキューの構造体
-#[allow(dead_code)]
-#[derive(Clone, Default, std::fmt::Debug)]
-struct RevBinaryHeap<T> where T: Ord {
-    binary_heap: std::collections::BinaryHeap<std::cmp::Reverse<T>>
-}
-
-impl<T> RevBinaryHeap<T> where T: Ord {
-    #[allow(dead_code)]
-    fn new() -> RevBinaryHeap<T> {
-        return RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() };
-    }
-    #[allow(dead_code)]
-    fn is_empty(&self) -> bool {
-        return self.binary_heap.is_empty();
-    }
-    #[allow(dead_code)]
-    fn len(&self) -> usize {
-        return self.binary_heap.len();
-    }
-    #[allow(dead_code)]
-    fn push(&mut self, item: T) {
-        self.binary_heap.push(std::cmp::Reverse(item));
-    }
-    #[allow(dead_code)]
-    fn pop(&mut self) -> Option<T> {
-        if !self.is_empty() {
-            let std::cmp::Reverse(ret)=self.binary_heap.pop().unwrap();
-            return Some(ret);
-        } else {
-            return None;
-        }
-    }
-    #[allow(dead_code)]
-    fn clear(&mut self) {
-        self.binary_heap.clear();
     }
 }
 
@@ -1219,3 +1428,36 @@ impl Blen for usize {
         return self.ilog2() as usize;
     }
 }
+
+/// プリミティブな整数型についてimplを定義するマクロ
+macro_rules! impl_integer {
+    ($($ty:ty),*) => {
+        $(
+            impl Usize for $ty {
+                fn usize(self) -> usize {
+                    return self as usize;
+                }
+            }
+
+            impl Isize for $ty {
+                fn isize(self) -> isize {
+                    return self as isize;
+                }
+            }
+
+            impl Zero for $ty {
+                fn zero_val() -> Self {
+                    return 0;
+                }
+            }
+
+            impl One for $ty {
+                fn one_val() -> Self {
+                    return 1;
+                }
+            }
+        )*
+    }
+}
+
+impl_integer!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
