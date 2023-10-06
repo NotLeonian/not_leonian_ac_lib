@@ -1,7 +1,11 @@
-//! <https://github.com/NotLeonian/not_leonian_ac_lib>
+//! <https://github.com/NotLeonian/not_leonian_ac_lib>  
+//!   
+//! Copyright (c) 2023 Not_Leonian  
+//! Released under the MIT license  
+//! <https://opensource.org/licenses/mit-license.php>  
 
 fn main() {
-    /// インタラクティブ問題の場合、proconio::input!マクロからproconio::input_interactive!マクロへ変更
+    /// インタラクティブ問題ならばproconio::input!マクロをproconio::input_interactive!マクロに変更
     macro_rules! input {
         ($($tt:tt)*) => {
             proconio::input!($($tt)*);
@@ -55,56 +59,51 @@ impl<T, const N: usize> Outputln for [T;N] where T: Sized + std::fmt::Display {
 }
 
 /// 配列やベクターの中身を複数行で出力するトレイト
-trait Outputlines {
+trait Outputlns {
     /// 配列やベクターの中身を複数行で出力する関数
-    fn outputlines(&self);
+    fn outputlns(&self);
 }
 
-impl<T> Outputlines for Vec<T> where T: Outputln {
-    fn outputlines(&self) {
+impl<T> Outputlns for Vec<T> where T: Outputln {
+    fn outputlns(&self) {
         for v in self {
             v.outputln();
         }
     }
 }
 
-impl<T, const N: usize> Outputlines for [T;N] where T: Sized + Outputln {
-    fn outputlines(&self) {
+impl<T, const N: usize> Outputlns for [T;N] where T: Sized + Outputln {
+    fn outputlns(&self) {
         for v in self {
             v.outputln();
         }
     }
 }
 
-/// 条件によって変わる1行を出力するトレイト
-trait Outputif {
-    /// 条件によって変わる1行を出力する関数（引数は順に真の場合、偽の場合の出力）
-    fn outputif<T1,T2>(self, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display;
-    /// 条件によって"Yes"または"No"の1行を出力する関数
-    fn outputln(self);
+/// 条件によって変わる1行を出力する関数（引数は順に条件と真の場合、偽の場合の出力）
+#[allow(dead_code)]
+fn outputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
+    if cond {
+        println!("{}",ok);
+    } else {
+        println!("{}",bad);
+    }
 }
 
-impl Outputif for bool {
-    fn outputif<T1,T2>(self, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
-        if self {
-            println!("{}",ok);
-        } else {
-            println!("{}",bad);
-        }
-    }
-    fn outputln(self) {
-        self.outputif("Yes", "No");
-    }
+/// 条件によって"Yes"または"No"の1行を出力する関数
+#[allow(dead_code)]
+fn outputyn(cond: bool) {
+    outputif(cond, "Yes", "No");
 }
 
 /// 存在すれば値を、存在しなければ-1を出力するトレイト
-trait OutputExistence {
+trait OutputValOr {
     /// 値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
-    fn output_existence(self, max: Self);
+    fn output_val_or(self, max: Self);
 }
 
-impl OutputExistence for usize {
-    fn output_existence(self, max: Self) {
+impl OutputValOr for usize {
+    fn output_val_or(self, max: Self) {
         if self<max {
             println!("{}",self);
         } else {
@@ -135,7 +134,7 @@ impl<T> MoveRight for Vec<T> where T: Clone {
 /// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
 #[allow(dead_code)]
 fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
-    return (begin..end).map(|i| func(i)).collect::<Vec::<T>>();
+    (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
 }
 
 /// usizeにキャストするトレイト
@@ -152,104 +151,99 @@ trait Isize {
 
 /// max関数
 #[allow(dead_code)]
-fn max<T>(left: T, right: T) -> T where T: std::cmp::PartialOrd {
-    return if left>right {
+fn max<T>(left: T, right: T) -> T where T: PartialOrd {
+    if left>right {
         left
     } else {
         right
-    };
+    }
 }
 
 /// min関数
 #[allow(dead_code)]
-fn min<T>(left: T, right: T) -> T where T: std::cmp::PartialOrd {
-    return if left<right {
+fn min<T>(left: T, right: T) -> T where T: PartialOrd {
+    if left<right {
         left
     } else {
         right
-    };
+    }
 }
 
 /// chminとchmaxのトレイト
-trait Chminmax {
-    /// challengerのほうが大きければchallengerで上書きする関数
-    fn chmax(&mut self, challenger: Self);
+trait ChminChmax {
     /// challengerのほうが小さければchallengerで上書きする関数
     fn chmin(&mut self, challenger: Self);
+    /// challengerのほうが大きければchallengerで上書きする関数
+    fn chmax(&mut self, challenger: Self);
 }
 
-impl<T> Chminmax for T where T: Clone + std::cmp::PartialOrd {
-    fn chmax(&mut self, challenger: Self) {
-        if challenger>*self {
+impl<T> ChminChmax for T where T: Clone + PartialOrd {
+    fn chmin(&mut self, challenger: Self) {
+        if challenger<*self {
             *self=challenger;
         }
     }
-    fn chmin(&mut self, challenger: Self) {
-        if challenger<*self {
+    fn chmax(&mut self, challenger: Self) {
+        if challenger>*self {
             *self=challenger;
         }
     }
 }
 
 /// 1次元ベクターについてのchminとchmaxのトレイト
-trait ChminmaxVec where Self: std::ops::Index<usize> {
-    /// ベクターの中身について、添字challengerの値のほうが大きければ上書きする関数
-    fn chmax_vec(&mut self, index: usize, challenger: usize);
+trait ChminChmaxVec where Self: std::ops::Index<usize> {
     /// ベクターの中身について、添字challengerの値のほうが小さければ上書きする関数
     fn chmin_vec(&mut self, index: usize, challenger: usize);
+    /// ベクターの中身について、添字challengerの値のほうが大きければ上書きする関数
+    fn chmax_vec(&mut self, index: usize, challenger: usize);
 }
 
-impl<T> ChminmaxVec for Vec<T> where T: Clone + std::cmp::PartialOrd {
-    fn chmax_vec(&mut self, index: usize, challenger: usize) {
-        if self[challenger]>self[index] {
-            self[index]=self[challenger].clone();
-        }
-    }
+impl<T> ChminChmaxVec for Vec<T> where T: Clone + PartialOrd {
     fn chmin_vec(&mut self, index: usize, challenger: usize) {
         if self[challenger]<self[index] {
             self[index]=self[challenger].clone();
         }
     }
-}
-
-impl<T, const N: usize> ChminmaxVec for [T;N] where T: Clone + std::cmp::PartialOrd {
     fn chmax_vec(&mut self, index: usize, challenger: usize) {
         if self[challenger]>self[index] {
             self[index]=self[challenger].clone();
         }
     }
+}
+
+impl<T, const N: usize> ChminChmaxVec for [T;N] where T: Clone + PartialOrd {
     fn chmin_vec(&mut self, index: usize, challenger: usize) {
         if self[challenger]<self[index] {
+            self[index]=self[challenger].clone();
+        }
+    }
+    fn chmax_vec(&mut self, index: usize, challenger: usize) {
+        if self[challenger]>self[index] {
             self[index]=self[challenger].clone();
         }
     }
 }
 
 /// 添字についてchminとchmaxを行うトレイト
-trait ChminmaxIndex<T> where T: std::ops::Index<Self>, T::Output: std::cmp::PartialOrd {
-    /// vecの現在の添字の値よりchallengerの値のほうが大きければchallengerで上書きする関数
-    fn chmax_index(&mut self, vec: &T, challenger: Self);
+trait ChminChmaxIndex<T> where T: std::ops::Index<Self>, T::Output: PartialOrd {
     /// vecの現在の添字の値よりchallengerの値のほうが小さければchallengerで上書きする関数
     fn chmin_index(&mut self, vec: &T, challenger: Self);
-    /// vecの現在の添字の値よりchallengerの値のほうが小さくなければchallengerで上書きする関数
-    fn chmaxeq_index(&mut self, vec: &T, challenger: Self);
+    /// vecの現在の添字の値よりchallengerの値のほうが大きければchallengerで上書きする関数
+    fn chmax_index(&mut self, vec: &T, challenger: Self);
     /// vecの現在の添字の値よりchallengerの値のほうが大きくなければchallengerで上書きする関数
     fn chmineq_index(&mut self, vec: &T, challenger: Self);
+    /// vecの現在の添字の値よりchallengerの値のほうが小さくなければchallengerで上書きする関数
+    fn chmaxeq_index(&mut self, vec: &T, challenger: Self);
 }
 
-impl<T> ChminmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: std::cmp::PartialOrd {
-    fn chmax_index(&mut self, vec: &T, challenger: Self) {
-        if vec[challenger]>vec[*self] {
-            *self=challenger;
-        }
-    }
+impl<T> ChminChmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: PartialOrd {
     fn chmin_index(&mut self, vec: &T, challenger: Self) {
         if vec[challenger]<vec[*self] {
             *self=challenger;
         }
     }
-    fn chmaxeq_index(&mut self, vec: &T, challenger: Self) {
-        if vec[challenger]>=vec[*self] {
+    fn chmax_index(&mut self, vec: &T, challenger: Self) {
+        if vec[challenger]>vec[*self] {
             *self=challenger;
         }
     }
@@ -258,94 +252,99 @@ impl<T> ChminmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: st
             *self=challenger;
         }
     }
+    fn chmaxeq_index(&mut self, vec: &T, challenger: Self) {
+        if vec[challenger]>=vec[*self] {
+            *self=challenger;
+        }
+    }
 }
 
 /// 1次元ベクターについてのAddAssignのトレイト
-trait VecAddAssign where Self: std::ops::Index<usize> {
+trait IndexedAddAssign where Self: std::ops::Index<usize> {
     /// 添字l_indexの値+=添字r_indexの値の関数
-    fn vec_add_assign(&mut self, l_index: usize, r_index: usize);
+    fn indexed_add_assign(&mut self, l_index: usize, r_index: usize);
 }
 
-impl<T> VecAddAssign for Vec<T> where T: Clone + std::ops::Add<Output=T> {
-    fn vec_add_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T> IndexedAddAssign for Vec<T> where T: Clone + std::ops::Add<Output=T> {
+    fn indexed_add_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()+self[r_index].clone();
     }
 }
 
-impl<T, const N: usize> VecAddAssign for [T;N] where T: Clone + std::ops::Add<Output=T> {
-    fn vec_add_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T, const N: usize> IndexedAddAssign for [T;N] where T: Clone + std::ops::Add<Output=T> {
+    fn indexed_add_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()+self[r_index].clone();
     }
 }
 
 /// 1次元ベクターについてのSubAssignのトレイト
-trait VecSubAssign where Self: std::ops::Index<usize> {
+trait IndexedSubAssign where Self: std::ops::Index<usize> {
     /// 添字l_indexの値-=添字r_indexの値の関数
-    fn vec_sub_assign(&mut self, l_index: usize, r_index: usize);
+    fn indexed_sub_assign(&mut self, l_index: usize, r_index: usize);
 }
 
-impl<T> VecSubAssign for Vec<T> where T: Clone + std::ops::Sub<Output=T> {
-    fn vec_sub_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T> IndexedSubAssign for Vec<T> where T: Clone + std::ops::Sub<Output=T> {
+    fn indexed_sub_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()-self[r_index].clone();
     }
 }
 
-impl<T, const N: usize> VecSubAssign for [T;N] where T: Clone + std::ops::Sub<Output=T> {
-    fn vec_sub_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T, const N: usize> IndexedSubAssign for [T;N] where T: Clone + std::ops::Sub<Output=T> {
+    fn indexed_sub_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()-self[r_index].clone();
     }
 }
 
 /// 1次元ベクターについてのMulAssignのトレイト
-trait VecMulAssign where Self: std::ops::Index<usize> {
+trait IndexedMulAssign where Self: std::ops::Index<usize> {
     /// 添字l_indexの値*=添字r_indexの値の関数
-    fn vec_mul_assign(&mut self, l_index: usize, r_index: usize);
+    fn indexed_mul_assign(&mut self, l_index: usize, r_index: usize);
 }
 
-impl<T> VecMulAssign for Vec<T> where T: Clone + std::ops::Mul<Output=T> {
-    fn vec_mul_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T> IndexedMulAssign for Vec<T> where T: Clone + std::ops::Mul<Output=T> {
+    fn indexed_mul_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()*self[r_index].clone();
     }
 }
 
-impl<T, const N: usize> VecMulAssign for [T;N] where T: Clone + std::ops::Mul<Output=T> {
-    fn vec_mul_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T, const N: usize> IndexedMulAssign for [T;N] where T: Clone + std::ops::Mul<Output=T> {
+    fn indexed_mul_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()*self[r_index].clone();
     }
 }
 
 /// 1次元ベクターについてのDivAssignのトレイト
-trait VecDivAssign where Self: std::ops::Index<usize> {
+trait IndexedDivAssign where Self: std::ops::Index<usize> {
     /// 添字l_indexの値/=添字r_indexの値の関数
-    fn vec_div_assign(&mut self, l_index: usize, r_index: usize);
+    fn indexed_div_assign(&mut self, l_index: usize, r_index: usize);
 }
 
-impl<T> VecDivAssign for Vec<T> where T: Clone + std::ops::Div<Output=T> {
-    fn vec_div_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T> IndexedDivAssign for Vec<T> where T: Clone + std::ops::Div<Output=T> {
+    fn indexed_div_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()/self[r_index].clone();
     }
 }
 
-impl<T, const N: usize> VecDivAssign for [T;N] where T: Clone + std::ops::Div<Output=T> {
-    fn vec_div_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T, const N: usize> IndexedDivAssign for [T;N] where T: Clone + std::ops::Div<Output=T> {
+    fn indexed_div_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()/self[r_index].clone();
     }
 }
 
 /// 1次元ベクターについてのRemAssignのトレイト
-trait VecRemAssign where Self: std::ops::Index<usize> {
+trait IndexedRemAssign where Self: std::ops::Index<usize> {
     /// 添字l_indexの値%=添字r_indexの値の関数
-    fn vec_rem_assign(&mut self, l_index: usize, r_index: usize);
+    fn indexed_rem_assign(&mut self, l_index: usize, r_index: usize);
 }
 
-impl<T> VecRemAssign for Vec<T> where T: Clone + std::ops::Rem<Output=T> {
-    fn vec_rem_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T> IndexedRemAssign for Vec<T> where T: Clone + std::ops::Rem<Output=T> {
+    fn indexed_rem_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()%self[r_index].clone();
     }
 }
 
-impl<T, const N: usize> VecRemAssign for [T;N] where T: Clone + std::ops::Rem<Output=T> {
-    fn vec_rem_assign(&mut self, l_index: usize, r_index: usize) {
+impl<T, const N: usize> IndexedRemAssign for [T;N] where T: Clone + std::ops::Rem<Output=T> {
+    fn indexed_rem_assign(&mut self, l_index: usize, r_index: usize) {
         self[l_index]=self[l_index].clone()%self[r_index].clone();
     }
 }
@@ -373,7 +372,7 @@ trait Graph where Self: Sized {
             g.push(a, b, 1);
             g.push(b, a, 1);
         }
-        return g;
+        g
     }
     /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
     fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
@@ -382,7 +381,7 @@ trait Graph where Self: Sized {
         for &(a,b) in ab {
             g.push(a, b, 1);
         }
-        return g;
+        g
     }
     /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
     fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
@@ -392,7 +391,7 @@ trait Graph where Self: Sized {
             g.push(a, b, w);
             g.push(b, a, w);
         }
-        return g;
+        g
     }
     /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
     fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
@@ -401,18 +400,18 @@ trait Graph where Self: Sized {
         for &(a,b,w) in abw {
             g.push(a, b, w);
         }
-        return g;
+        g
     }
     /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
 }
 
-impl Graph for Vec<Vec<(usize,usize)>> {
+impl Graph for VecGraph {
     fn new(n: usize) -> Self {
-        return vec![Vec::<(usize,usize)>::new();n];
+        vec![Vec::<(usize,usize)>::new();n]
     }
     fn size(&self) -> usize {
-        return self.len();
+        self.len()
     }
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].push((b,w));
@@ -450,16 +449,16 @@ impl Graph for Vec<Vec<(usize,usize)>> {
                 }
             }
         }
-        return dist;
+        dist
     }
 }
 
-impl Graph for Vec<std::collections::BTreeSet<(usize,usize)>> {
+impl Graph for SetGraph {
     fn new(n: usize) -> Self {
-        return vec![std::collections::BTreeSet::<(usize,usize)>::new();n];
+        vec![std::collections::BTreeSet::<(usize,usize)>::new();n]
     }
     fn size(&self) -> usize {
-        return self.len();
+        self.len()
     }
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].insert((b,w));
@@ -497,8 +496,32 @@ impl Graph for Vec<std::collections::BTreeSet<(usize,usize)>> {
                 }
             }
         }
-        return dist;
+        dist
     }
+}
+
+/// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+#[allow(dead_code)]
+fn construct_graph<G>(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> G where G: Graph {
+    G::construct_graph(n, m, ab)
+}
+
+/// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+#[allow(dead_code)]
+fn construct_directed_graph<G>(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> G where G: Graph {
+    G::construct_directed_graph(n, m, ab)
+}
+
+/// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+#[allow(dead_code)]
+fn construct_weighted_graph<G>(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> G where G: Graph {
+    G::construct_weighted_graph(n, m, abw)
+}
+
+/// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+#[allow(dead_code)]
+fn construct_weighted_directed_graph<G>(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> G where G: Graph {
+    G::construct_weighted_directed_graph(n, m, abw)
 }
 
 /// 二分探索の関数（整数）
@@ -519,7 +542,7 @@ fn binary_search<F>(ok: isize, bad: isize, determine: F) -> isize where F: Fn(is
             bad=mid;
         }
     }
-    return ok;
+    ok
 }
 
 /// 二分探索の関数（浮動小数点数）
@@ -540,7 +563,7 @@ fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 w
             bad=mid;
         }
     }
-    return ok;
+    ok
 }
 
 /// 最小値を取り出すことのできる優先度つきキューの構造体
@@ -551,29 +574,25 @@ struct RevBinaryHeap<T> where T: Ord {
 }
 
 impl<T> RevBinaryHeap<T> where T: Ord {
-    #[allow(dead_code)]
-    fn new() -> RevBinaryHeap<T> {
-        return RevBinaryHeap { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() };
+    fn new() -> Self {
+        Self { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() }
     }
-    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
-        return self.binary_heap.is_empty();
+        self.binary_heap.is_empty()
     }
     #[allow(dead_code)]
     fn len(&self) -> usize {
-        return self.binary_heap.len();
+        self.binary_heap.len()
     }
-    #[allow(dead_code)]
     fn push(&mut self, item: T) {
         self.binary_heap.push(std::cmp::Reverse(item));
     }
-    #[allow(dead_code)]
     fn pop(&mut self) -> Option<T> {
         if !self.is_empty() {
             let std::cmp::Reverse(ret)=self.binary_heap.pop().unwrap();
-            return Some(ret);
+            Some(ret)
         } else {
-            return None;
+            None
         }
     }
     #[allow(dead_code)]
@@ -590,13 +609,13 @@ trait Zero {
 
 impl<M> Zero for ac_library::StaticModInt<M> where M: ac_library::Modulus {
     fn zero_val() -> Self {
-        return Self::new(0);
+        Self::new(0)
     }
 }
 
 impl<I> Zero for ac_library::DynamicModInt<I> where I: ac_library::Id {
     fn zero_val() -> Self {
-        return Self::new(0);
+        Self::new(0)
     }
 }
 
@@ -608,13 +627,13 @@ trait One {
 
 impl<M> One for ac_library::StaticModInt<M> where M: ac_library::Modulus {
     fn one_val() -> Self {
-        return Self::new(1);
+        Self::new(1)
     }
 }
 
 impl<I> One for ac_library::DynamicModInt<I> where I: ac_library::Id {
     fn one_val() -> Self {
-        return Self::new(1);
+        Self::new(1)
     }
 }
 
@@ -632,7 +651,7 @@ impl<M> ModIntInv for ac_library::StaticModInt<M> where M: ac_library::Modulus {
             invs[i]=-invs[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
         }
         invs[0]=Self::new(0);
-        return invs;
+        invs
     }
 }
 
@@ -644,8 +663,14 @@ impl<I> ModIntInv for ac_library::DynamicModInt<I> where I: ac_library::Id {
             invs[i]=-invs[Self::modulus() as usize%i]*(Self::modulus() as usize/i);
         }
         invs[0]=Self::new(0);
-        return invs;
+        invs
     }
+}
+
+/// ModIntの逆元をベクターで列挙する関数（最初の要素には0が入る）
+#[allow(dead_code)]
+fn construct_modint_inverses<M>(nmax: usize) -> Vec<M> where M: ModIntInv {
+    ModIntInv::construct_modint_inverses(nmax)
 }
 
 /// ModIntの階乗についてのトレイト
@@ -662,7 +687,7 @@ impl<M> ModIntFact for ac_library::StaticModInt<M> where M: ac_library::Modulus 
         for i in 2..=nmax {
             facts[i]=facts[i-1]*i;
         }
-        return facts;
+        facts
     }
     fn construct_modint_fact_inverses(nmax: usize, invs: &Vec<Self>) -> Vec<Self> {
         assert!(invs.len() > nmax);
@@ -670,7 +695,7 @@ impl<M> ModIntFact for ac_library::StaticModInt<M> where M: ac_library::Modulus 
         for i in 2..=nmax {
             factinvs[i]=factinvs[i-1]*invs[i];
         }
-        return factinvs;
+        factinvs
     }
 }
 
@@ -680,7 +705,7 @@ impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
         for i in 2..=nmax {
             facts[i]=facts[i-1]*i;
         }
-        return facts;
+        facts
     }
     fn construct_modint_fact_inverses(nmax: usize, invs: &Vec<Self>) -> Vec<Self> {
         assert!(invs.len() > nmax);
@@ -688,59 +713,71 @@ impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
         for i in 2..=nmax {
             factinvs[i]=factinvs[i-1]*invs[i];
         }
-        return factinvs;
+        factinvs
     }
+}
+
+/// ModIntの階乗をベクターで列挙する関数
+#[allow(dead_code)]
+fn construct_modint_facts<M>(nmax: usize) -> Vec<M> where M: ModIntFact {
+    M::construct_modint_facts(nmax)
+}
+
+/// ModIntの階乗の逆元をベクターで列挙する関数
+#[allow(dead_code)]
+fn construct_modint_fact_inverses<M>(nmax: usize, invs: &Vec<M>) -> Vec<M> where M: ModIntFact {
+    M::construct_modint_fact_inverses(nmax, invs)
 }
 
 /// 累積和についてのトレイト
 trait PrefixSum {
     /// 累積和のベクターを構築する関数
-    fn construct_prefix_sum(array: &Self) -> Self;
+    fn construct_prefix_sum(&self) -> Self;
     /// 構築した累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
     fn calculate_partial_sum(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
 }
 
 impl<T> PrefixSum for Vec<T> where T: Clone + Zero + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
-    fn construct_prefix_sum(array: &Self) -> Self {
-        let mut prefix_sum=vec![T::zero_val();array.len()+1];
-        for i in 0..array.len() {
-            prefix_sum[i+1]=prefix_sum[i].clone()+array[i].clone();
+    fn construct_prefix_sum(&self) -> Self {
+        let mut prefix_sum=vec![T::zero_val();self.len()+1];
+        for i in 0..self.len() {
+            prefix_sum[i+1]=prefix_sum[i].clone()+self[i].clone();
         }
-        return prefix_sum;
+        prefix_sum
     }
     fn calculate_partial_sum(&self, l: usize, r: usize) -> <Self as std::ops::Index<usize>>::Output {
         assert!(l < self.len() && r <= self.len());
-        return self[r].clone()-self[l].clone();
+        self[r].clone()-self[l].clone()
     }
 }
 
 /// 2次元累積和についてのトレイト
 trait TwoDimPrefixSum {
     /// 2次元累積和のベクターを構築する関数
-    fn construct_2d_prefix_sum(array: &Self) -> Self;
+    fn construct_2d_prefix_sum(&self) -> Self;
     /// 構築した2次元累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
     fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <Self::Output as std::ops::Index<usize>>::Output where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize>;
 }
 
 impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + Zero + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
-    fn construct_2d_prefix_sum(array: &Self) -> Self {
-        let mut prefix_sum=vec![vec![T::zero_val();array[0].len()+1];array.len()+1];
-        for i in 0..array.len() {
-            assert!(array[i].len()==array[0].len());
-            for j in 0..array[0].len() {
-                prefix_sum[i+1][j+1]=prefix_sum[i+1][j].clone()+array[i][j].clone();
+    fn construct_2d_prefix_sum(&self) -> Self {
+        let mut prefix_sum=vec![vec![T::zero_val();self[0].len()+1];self.len()+1];
+        for i in 0..self.len() {
+            assert!(self[i].len()==self[0].len());
+            for j in 0..self[0].len() {
+                prefix_sum[i+1][j+1]=prefix_sum[i+1][j].clone()+self[i][j].clone();
             }
         }
-        for j in 0..array[0].len() {
-            for i in 0..array.len() {
+        for j in 0..self[0].len() {
+            for i in 0..self.len() {
                 prefix_sum[i+1][j+1]=prefix_sum[i][j+1].clone()+prefix_sum[i+1][j+1].clone();
             }
         }
-        return prefix_sum;
+        prefix_sum
     }
     fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <<Self as std::ops::Index<usize>>::Output as std::ops::Index<usize>>::Output {
         assert!(l_i < self.len() && l_j < self[0].len() && r_i <= self.len() && r_j <= self[0].len());
-        return self[r_i][r_j].clone()-self[r_i][l_j].clone()-self[l_i][r_j].clone()+self[l_i][l_j].clone();
+        self[r_i][r_j].clone()-self[r_i][l_j].clone()-self[l_i][r_j].clone()+self[l_i][l_j].clone()
     }
 }
 
@@ -771,7 +808,7 @@ impl Primes for usize {
                 return false;
             }
         }
-        return true;
+        true
     }
     fn is_prime_power(mut self) -> bool {
         for i in 2..=num_integer::sqrt(self) {
@@ -782,7 +819,7 @@ impl Primes for usize {
                 return self==1;
             }
         }
-        return true;
+        true
     }
     fn enumerate_divisors(self) -> Vec<Self> {
         let mut divs=Vec::<Self>::new();
@@ -798,7 +835,7 @@ impl Primes for usize {
         while let Some(i)=high.pop() {
             divs.push(i);
         }
-        return divs;
+        divs
     }
     fn prime_factorize(mut self) -> Vec<(Self,Self)> {
         let mut pes=Vec::<(Self,Self)>::new();
@@ -815,7 +852,7 @@ impl Primes for usize {
         if self>1 {
             pes.push((self,1));
         }
-        return pes;
+        pes
     }
     fn legendre_s_formula(mut self, p: usize) -> usize {
         let mut e=0;
@@ -823,7 +860,7 @@ impl Primes for usize {
             e+=self/p;
             self/=p;
         }
-        return e;
+        e
     }
     fn sieve_of_eratosthenes(nmax: Self) -> Vec<bool> {
         let mut is_prime=vec![true;nmax+1];
@@ -836,7 +873,7 @@ impl Primes for usize {
                 }
             }
         }
-        return is_prime;
+        is_prime
     }
     fn linear_sieve(nmax: Self) -> Vec<Self> {
         let mut lpf=vec![0;nmax+1];
@@ -853,7 +890,7 @@ impl Primes for usize {
                 lpf[p*i]=p;
             }
         }
-        return lpf;
+        lpf
     }
     fn fast_prime_factorize(mut self, linear_sieve: &Vec<Self>) -> Vec<(Self,Self)> {
         assert!(linear_sieve.len() > self);
@@ -871,11 +908,23 @@ impl Primes for usize {
             self/=linear_sieve[self];
         }
         pes.push((p,e));
-        return pes;
+        pes
     }
 }
 
-/// N1×N2行列の構造体
+/// エラトステネスの篩で素数を列挙する関数
+#[allow(dead_code)]
+fn sieve_of_eratosthenes<T>(nmax: T) -> Vec<bool> where T: Primes {
+    T::sieve_of_eratosthenes(nmax)
+}
+
+/// 線形篩で最小素因数を列挙する関数
+#[allow(dead_code)]
+fn linear_sieve<T>(nmax: T) -> Vec<T> where T: Primes {
+    T::linear_sieve(nmax)
+}
+
+/// N1×N2行列の構造体（num::powで行列累乗を計算できる）
 #[derive(Clone, std::fmt::Debug)]
 struct Matrix<T, const N1: usize, const N2: usize> {
     matrix: [[T;N2];N1]
@@ -884,13 +933,13 @@ struct Matrix<T, const N1: usize, const N2: usize> {
 impl<T, const N1: usize, const N2: usize> std::ops::Deref for Matrix<T,N1,N2> {
     type Target = [[T;N2];N1];
     fn deref(&self) -> &Self::Target {
-        return &self.matrix;
+        &self.matrix
     }
 }
 
 impl<T, const N1: usize, const N2: usize> std::ops::DerefMut for Matrix<T,N1,N2> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        return &mut self.matrix;
+        &mut self.matrix
     }
 }
 
@@ -904,27 +953,25 @@ impl<T, const N1: usize, const N2: usize> PartialEq for Matrix<T,N1,N2> where T:
                 }
             }
         }
-        return ret;
+        ret
     }
     fn ne(&self, other: &Self) -> bool {
-        return !self.eq(other);
+        !self.eq(other)
     }
 }
 
 impl<T, const N1: usize, const N2: usize> Zero for Matrix<T,N1,N2> where T: Copy + Zero {
     fn zero_val() -> Self {
-        return Self {
-            matrix: [[T::zero_val();N2];N1]
-        };
+        Self { matrix: [[T::zero_val();N2];N1] }
     }
 }
 
 impl<T, const N1: usize, const N2: usize> num::Zero for Matrix<T,N1,N2> where T: Copy + Zero + std::ops::Add<Output=T> + PartialEq {
     fn zero() -> Self {
-        return Self::zero_val();
+        Self::zero_val()
     }
     fn is_zero(&self) -> bool {
-        return *self==Self::zero();
+        *self==Self::zero()
     }
 }
 
@@ -934,16 +981,16 @@ impl<T, const N: usize> One for Matrix<T,N,N> where T: Copy + Zero + One {
         for i in 0..N {
             matrix[i][i]=T::one_val();
         }
-        return matrix;
+        matrix
     }
 }
 
 impl<T, const N: usize> num::One for Matrix<T,N,N> where T: Copy + Zero + One + std::ops::AddAssign + std::ops::Mul<Output=T> + PartialEq {
     fn one() -> Self {
-        return Self::one_val();
+        Self::one_val()
     }
     fn is_one(&self) -> bool {
-        return *self==Self::one();
+        *self==Self::one()
     }
 }
 
@@ -965,7 +1012,7 @@ impl<T, const N1: usize, const N2: usize> std::ops::Add for Matrix<T,N1,N2> wher
                 self[i][j]=self[i][j].clone()+rhs[i][j].clone();
             }
         }
-        return self;
+        self
     }
 }
 
@@ -977,7 +1024,7 @@ impl<T, const N1: usize, const N2: usize> std::ops::Neg for Matrix<T,N1,N2> wher
                 self[i][j]=-self[i][j].clone();
             }
         }
-        return self;
+        self
     }
 }
 
@@ -999,7 +1046,7 @@ impl<T, const N1: usize, const N2: usize> std::ops::Sub for Matrix<T,N1,N2> wher
                 self[i][j]=self[i][j].clone()-rhs[i][j].clone();
             }
         }
-        return self;
+        self
     }
 }
 
@@ -1020,33 +1067,40 @@ impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<
                 }
             }
         }
-        return prod;
+        prod
+    }
+}
+
+/// FunctionalGraphのトレイト
+trait FunctionalGraph where Self: Sized {
+    /// FunctionalGraphのダブリングを前計算する関数
+    fn doubling(&self, cntmax: usize) -> Vec<Self>;
+}
+
+impl FunctionalGraph for Vec<usize> {
+    fn doubling(&self, cntmax: usize) -> Vec<Self> {
+        let log=cntmax.ilog2() as usize+1;
+        let mut doubling=vec![vec![0;log];self.len()];
+        for i in 0..self.len() {
+            doubling[i][0]=self[i];
+        }
+        for k in 0..log-1 {
+            for i in 0..self.len() {
+                doubling[i][k+1]=doubling[doubling[i][k]][k];
+            }
+        }
+        doubling
     }
 }
 
 /// ダブリングのトレイト
 trait Doubling where Self: Sized + std::ops::Index<usize>, Self::Output: std::ops::Index<usize> {
-    /// ダブリングの前計算を行う関数
-    fn precompute(to: &Self::Output, cntmax: usize) -> Self;
-    /// ダブリングのDPテーブルをもとにstartからcnt回移動した先を返す関数（0-indexed）
-    fn doubling_answer(&self, start: usize, cnt: usize) -> <Self::Output as std::ops::Index<usize>>::Output;
+    /// FunctionalGraphでstartからcnt回移動した先を返す関数（0-indexed）
+    fn terminus(&self, start: usize, cnt: usize) -> <Self::Output as std::ops::Index<usize>>::Output;
 }
 
 impl Doubling for Vec<Vec<usize>> {
-    fn precompute(to: &Vec<usize>, cntmax: usize) -> Self {
-        let log=cntmax.ilog2() as usize+1;
-        let mut doubling=vec![vec![0;log];to.len()];
-        for i in 0..to.len() {
-            doubling[i][0]=to[i];
-        }
-        for k in 0..log-1 {
-            for i in 0..to.len() {
-                doubling[i][k+1]=doubling[doubling[i][k]][k];
-            }
-        }
-        return doubling;
-    }
-    fn doubling_answer(&self, mut start: usize, mut cnt: usize) -> <Self::Output as std::ops::Index<usize>>::Output {
+    fn terminus(&self, mut start: usize, mut cnt: usize) -> usize {
         let mut k=0;
         while cnt>0 {
             if (cnt&1)>0 {
@@ -1055,7 +1109,7 @@ impl Doubling for Vec<Vec<usize>> {
             cnt/=2;
             k+=1;
         }
-        return start;
+        start
     }
 }
 
@@ -1064,45 +1118,45 @@ trait FPS {
     /// 形式的冪級数の和を割り当てる関数
     fn fps_add_assign(&mut self, g: &Self);
     /// 形式的冪級数の和を返す関数
-    fn fps_add(f: &Self, g: &Self) -> Self;
+    fn add(f: &Self, g: &Self) -> Self;
     /// 形式的冪級数の差を割り当てる関数
     fn fps_sub_assign(&mut self, g: &Self);
     /// 形式的冪級数の差を返す関数
-    fn fps_sub(f: &Self, g: &Self) -> Self;
+    fn sub(f: &Self, g: &Self) -> Self;
     /// 形式的冪級数の定数倍を割り当てる関数
     fn fps_scalar_assign(&mut self, k: isize);
     /// 形式的冪級数の定数倍を返す関数
-    fn fps_scalar(f: &Self, k: isize) -> Self;
+    fn scalar(f: &Self, k: isize) -> Self;
     /// 形式的冪級数の積を割り当てる関数
     fn fps_mul_assign(&mut self, g: &Self);
     /// 形式的冪級数の積を返す関数
-    fn fps_mul(f: &Self, g: &Self) -> Self;
+    fn mul(f: &Self, g: &Self) -> Self;
     /// 形式的冪級数の逆元を返す関数
     fn fps_inv(&self) -> Self;
     /// 形式的冪級数の商を割り当てる関数
     fn fps_div_assign(&mut self, g: &Self);
     /// 形式的冪級数の商を返す関数
-    fn fps_div(f: &Self, g: &Self) -> Self;
+    fn div(f: &Self, g: &Self) -> Self;
     /// 形式的冪級数の導関数を割り当てる関数
     fn fps_diff_assign(&mut self);
     /// 形式的冪級数の導関数を返す関数
-    fn fps_diff(f: &Self) -> Self;
+    fn fps_diff(&self) -> Self;
     /// 形式的冪級数の定積分を割り当てる関数
     fn fps_int_assign(&mut self);
     /// 形式的冪級数の定積分を返す関数
-    fn fps_int(f: &Self) -> Self;
+    fn fps_int(&self) -> Self;
     /// 形式的冪級数の対数を割り当てる関数
     fn fps_log_assign(&mut self);
     /// 形式的冪級数の対数を返す関数
-    fn fps_log(f: &Self) -> Self;
+    fn fps_log(&self) -> Self;
     /// 形式的冪級数の指数を割り当てる関数
     fn fps_exp_assign(&mut self);
     /// 形式的冪級数の指数を返す関数
-    fn fps_exp(f: &Self) -> Self;
+    fn fps_exp(&self) -> Self;
     /// 形式的冪級数の冪を割り当てる関数
     fn fps_pow_assign(&mut self, k: usize);
     /// 形式的冪級数の冪を返す関数
-    fn fps_pow(f: &Self, k: usize) -> Self;
+    fn fps_pow(&self, k: usize) -> Self;
 }
 
 impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
@@ -1113,11 +1167,11 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]+=g[i];
         }
     }
-    fn fps_add(f: &Self, g: &Self) -> Self {
+    fn add(f: &Self, g: &Self) -> Self {
         assert!(f.len() == g.len());
         let mut h=f.clone();
         h.fps_add_assign(&g);
-        return h;
+        h
     }
     fn fps_sub_assign(&mut self, g: &Self) {
         assert!(self.len() == g.len());
@@ -1126,11 +1180,11 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]-=g[i];
         }
     }
-    fn fps_sub(f: &Self, g: &Self) -> Self {
+    fn sub(f: &Self, g: &Self) -> Self {
         assert!(f.len() == g.len());
         let mut h=f.clone();
         h.fps_sub_assign(&g);
-        return h;
+        h
     }
     fn fps_scalar_assign(&mut self, k: isize) {
         let n=self.len()-1;
@@ -1138,23 +1192,23 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]*=k;
         }
     }
-    fn fps_scalar(f: &Self, k: isize) -> Self {
+    fn scalar(f: &Self, k: isize) -> Self {
         let mut h=f.clone();
         h.fps_scalar_assign(k);
-        return h;
+        h
     }
     fn fps_mul_assign(&mut self, g: &Self) {
         assert!(self.len() == g.len());
         let n=self.len()-1;
-        let h=FPS::fps_mul(self, g);
+        let h=FPS::mul(self, g);
         for i in 0..=n {
             self[i]=h[i];
         }
     }
-    fn fps_mul(f: &Self, g: &Self) -> Self {
+    fn mul(f: &Self, g: &Self) -> Self {
         assert!(f.len() == g.len());
         let n=f.len()-1;
-        return ac_library::convolution::convolution(&f[0..=n], &g[0..=n])[0..=n].to_vec();
+        ac_library::convolution::convolution(&f[0..=n], &g[0..=n])[0..=n].to_vec()
     }
     fn fps_inv(&self) -> Self {
         let n=self.len()-1;
@@ -1174,17 +1228,17 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
                 inv[i]-=f[i];
             }
         }
-        return inv;
+        inv
     }
     fn fps_div_assign(&mut self, g: &Self) {
         assert!(self.len() == g.len());
         self.fps_mul_assign(&g.fps_inv());
     }
-    fn fps_div(f: &Self, g: &Self) -> Self {
+    fn div(f: &Self, g: &Self) -> Self {
         assert!(f.len() == g.len());
         let mut h=f.clone();
         h.fps_div_assign(&g);
-        return h;
+        h
     }
     fn fps_diff_assign(&mut self) {
         let n=self.len()-1;
@@ -1192,10 +1246,10 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]=self[i+1]*(i+1);
         }
     }
-    fn fps_diff(f: &Self) -> Self {
-        let mut h=f.clone();
+    fn fps_diff(&self) -> Self {
+        let mut h=self.clone();
         h.fps_diff_assign();
-        return h;
+        h
     }
     fn fps_int_assign(&mut self) {
         let n=self.len()-1;
@@ -1204,10 +1258,10 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         }
         self[0]=ac_library::StaticModInt::<M>::new(0);
     }
-    fn fps_int(f: &Self) -> Self {
-        let mut h=f.clone();
+    fn fps_int(&self) -> Self {
+        let mut h=self.clone();
         h.fps_int_assign();
-        return h;
+        h
     }
     fn fps_log_assign(&mut self) {
         let n=self.len()-1;
@@ -1216,12 +1270,12 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]=h[i];
         }
     }
-    fn fps_log(f: &Self) -> Self {
-        let mut h=f.clone();
+    fn fps_log(&self) -> Self {
+        let mut h=self.clone();
         h.fps_diff_assign();
-        h.fps_div_assign(f);
+        h.fps_div_assign(self);
         h.fps_int_assign();
-        return h;
+        h
     }
     fn fps_exp_assign(&mut self) {
         let n=self.len()-1;
@@ -1230,9 +1284,9 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]=h[i];
         }
     }
-    fn fps_exp(f: &Self) -> Self {
-        assert!(f[0] == ac_library::StaticModInt::<M>::new(0));
-        let n=f.len()-1;
+    fn fps_exp(&self) -> Self {
+        assert!(self[0] == ac_library::StaticModInt::<M>::new(0));
+        let n=self.len()-1;
         let mut exp=vec![ac_library::StaticModInt::<M>::new(0);n+1];
         exp[0]=ac_library::StaticModInt::<M>::new(1);
         let mut curdeg=1;
@@ -1240,13 +1294,13 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             curdeg*=2;
             let mut fc=vec![ac_library::StaticModInt::<M>::new(0);n+1];
             for i in 0..std::cmp::min(curdeg,n+1) {
-                fc[i]=f[i];
+                fc[i]=self[i];
             }
             fc.fps_sub_assign(&FPS::fps_log(&exp));
             fc[0]+=1;
             exp.fps_mul_assign(&fc);
         }
-        return exp;
+        exp
     }
     fn fps_pow_assign(&mut self, k: usize) {
         let n=self.len()-1;
@@ -1273,10 +1327,10 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]=ac_library::StaticModInt::<M>::new(0);
         }
     }
-    fn fps_pow(f: &Self, k: usize) -> Self {
-        let mut h=f.clone();
+    fn fps_pow(&self, k: usize) -> Self {
+        let mut h=self.clone();
         h.fps_pow_assign(k);
-        return h;
+        h
     }
 }
 
@@ -1364,13 +1418,13 @@ impl FromChar for char {
         }
     }
     fn from_fig(self) -> usize {
-        return self.from_foo('0', '9');
+        self.from_foo('0', '9')
     }
     fn from_uppercase(self) -> usize {
-        return self.from_foo('A', 'Z');
+        self.from_foo('A', 'Z')
     }
     fn from_lowercase(self) -> usize {
-        return self.from_foo('a', 'z');
+        self.from_foo('a', 'z')
     }
 }
 
@@ -1395,13 +1449,13 @@ impl ToChar for usize {
         }
     }
     fn to_fig(self) -> char {
-        return self.to_foo('0', 10);
+        self.to_foo('0', 10)
     }
     fn to_uppercase(self) -> char {
-        return self.to_foo('A', 26);
+        self.to_foo('A', 26)
     }
     fn to_lowercase(self) -> char {
-        return self.to_foo('a', 26);
+        self.to_foo('a', 26)
     }
 }
 
@@ -1413,19 +1467,19 @@ trait ToDecimal {
 
 impl ToDecimal for String {
     fn to_decimal(&self, radix: usize) -> usize {
-        return usize::from_str_radix(&self, radix as u32).unwrap();
+        usize::from_str_radix(&self, radix as u32).unwrap()
     }
 }
 
 /// 2進法での桁数を求めるトレイト
-trait Blen {
+trait BinaryLen {
     /// 2進法での桁数を求める関数
-    fn blen(self) -> usize;
+    fn binary_len(self) -> usize;
 }
 
-impl Blen for usize {
-    fn blen(self) -> usize {
-        return self.ilog2() as usize;
+impl BinaryLen for usize {
+    fn binary_len(self) -> usize {
+        self.ilog2() as usize
     }
 }
 
@@ -1435,25 +1489,25 @@ macro_rules! impl_integer {
         $(
             impl Usize for $ty {
                 fn usize(self) -> usize {
-                    return self as usize;
+                    self as usize
                 }
             }
 
             impl Isize for $ty {
                 fn isize(self) -> isize {
-                    return self as isize;
+                    self as isize
                 }
             }
 
             impl Zero for $ty {
                 fn zero_val() -> Self {
-                    return 0;
+                    0
                 }
             }
 
             impl One for $ty {
                 fn one_val() -> Self {
-                    return 1;
+                    1
                 }
             }
         )*
