@@ -9,5 +9,8 @@ fn main() {
         };
     }
 
-    input!();
+    input!(q:usize,x:[usize;q]);
+    for x in x {
+        output_yes_or_no(x.is_prime());
+    }
 }

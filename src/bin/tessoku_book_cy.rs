@@ -9,5 +9,11 @@ fn main() {
         };
     }
 
-    input!();
+    input!(n:usize);
+    let sieve=sieve_of_eratosthenes(n);
+    for i in 2..=n {
+        if sieve[i] {
+            outputln!(i);
+        }
+    }
 }

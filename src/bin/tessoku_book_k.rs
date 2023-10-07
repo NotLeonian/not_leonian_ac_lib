@@ -9,5 +9,6 @@ fn main() {
         };
     }
 
-    input!();
+    input!(n:usize,x:usize,a:[usize;n]);
+    outputln!(binary_search(n as isize, -1, |mid| a[mid as usize]>=x)+1);
 }
