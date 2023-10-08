@@ -101,6 +101,103 @@ impl OutputValOr for usize {
     }
 }
 
+/// 1つ以上の変数を1行でstderrに出力するマクロ
+#[macro_export]
+#[allow(unused_macros)]
+macro_rules! eoutputln {
+    ($var:expr) => {
+        eprintln!("{}",$var);
+    };
+    ($var:expr,$($vars:expr),+) => {
+        print!("{} ",$var);
+        eoutputln!($($vars),+);
+    };
+}
+
+/// 配列やベクターの中身を1行でstderrに出力するトレイト
+pub trait Eoutputln {
+    /// 配列やベクターの中身を1行でstderrに出力する関数
+    fn eoutputln(&self);
+}
+
+impl<T> Eoutputln for Vec<T> where T: std::fmt::Display {
+    fn eoutputln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                eprint!("{} ",&var);
+            } else {
+                eprintln!("{}",&var);
+            }
+        }
+    }
+}
+
+impl<T, const N: usize> Eoutputln for [T;N] where T: Sized + std::fmt::Display {
+    fn eoutputln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<N-1 {
+                eprint!("{} ",&var);
+            } else {
+                eprintln!("{}",&var);
+            }
+        }
+    }
+}
+
+/// 配列やベクターの中身を複数行でstderrに出力するトレイト
+pub trait Eoutputlns {
+    /// 配列やベクターの中身を複数行でstderrに出力する関数
+    fn eoutputlns(&self);
+}
+
+impl<T> Eoutputlns for Vec<T> where T: Eoutputln {
+    fn eoutputlns(&self) {
+        for v in self {
+            v.eoutputln();
+        }
+    }
+}
+
+impl<T, const N: usize> Eoutputlns for [T;N] where T: Sized + Eoutputln {
+    fn eoutputlns(&self) {
+        for v in self {
+            v.eoutputln();
+        }
+    }
+}
+
+/// 条件によって変わる1行をstderrに出力する関数（引数は順に条件と真の場合、偽の場合の出力）
+#[allow(dead_code)]
+pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
+    if cond {
+        eprintln!("{}",ok);
+    } else {
+        eprintln!("{}",bad);
+    }
+}
+
+/// 条件によって"Yes"または"No"の1行をstderrに出力する関数
+#[allow(dead_code)]
+pub fn eoutput_yes_or_no(cond: bool) {
+    eoutputif(cond, "Yes", "No");
+}
+
+/// 存在すれば値を、存在しなければ-1をstderrに出力するトレイト
+pub trait EoutputValOr {
+    /// 値がmaxより小さければ自身を出力し、maxであれば-1をstderrに出力する関数
+    fn eoutput_val_or(self, max: Self);
+}
+
+impl EoutputValOr for usize {
+    fn eoutput_val_or(self, max: Self) {
+        if self<max {
+            eprintln!("{}",self);
+        } else {
+            eprintln!("-1");
+        }
+    }
+}
+
 /// ベクターの先頭にfilledを追加してmだけ右にずらす関数のトレイト
 pub trait MoveRight where Self: std::ops::Index<usize> {
     /// ベクターの先頭にfilledを追加してmだけ右にずらす関数
@@ -1397,9 +1494,9 @@ pub trait RationalReconstruct {
 impl<M> RationalReconstruct for ac_library::StaticModInt<M> where M: ac_library::Modulus {
     type Output = f64;
     fn rational_reconstruct(&self) -> Self::Output {
-        let mut v=(M::VALUE as i64, 0);
-        let mut w=(self.val() as i64, 1);
-        while w.0*w.0*2>M::VALUE as i64 {
+        let mut v=(M::VALUE as isize, 0);
+        let mut w=(self.val() as isize, 1);
+        while w.0*w.0*2>M::VALUE as isize {
             let q=v.0/w.0;
             let z=(v.0-q*w.0, v.1-q*w.1);
             v=w;
@@ -1412,9 +1509,9 @@ impl<M> RationalReconstruct for ac_library::StaticModInt<M> where M: ac_library:
 impl<I> RationalReconstruct for ac_library::DynamicModInt<I> where I: ac_library::Id {
     type Output = f64;
     fn rational_reconstruct(&self) -> Self::Output {
-        let mut v=(Self::modulus() as i64, 0);
-        let mut w=(self.val() as i64, 1);
-        while w.0*w.0*2>Self::modulus() as i64 {
+        let mut v=(Self::modulus() as isize, 0);
+        let mut w=(self.val() as isize, 1);
+        while w.0*w.0*2>Self::modulus() as isize {
             let q=v.0/w.0;
             let z=(v.0-q*w.0, v.1-q*w.1);
             v=w;
