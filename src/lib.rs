@@ -109,7 +109,7 @@ macro_rules! eoutputln {
         eprintln!("{}",$var);
     };
     ($var:expr,$($vars:expr),+) => {
-        print!("{} ",$var);
+        eprint!("{} ",$var);
         eoutputln!($($vars),+);
     };
 }
