@@ -1386,6 +1386,51 @@ impl BinaryLen for usize {
     }
 }
 
+/// 素数位数の有限体の元で表された有理数を推測するトレイト
+pub trait RationalReconstruct {
+    /// 関数の返り値の型
+    type Output;
+    /// 素数位数の有限体の元で表された有理数を推測する関数
+    fn rational_reconstruct(&self) -> Self::Output;
+}
+
+impl<M> RationalReconstruct for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    type Output = f64;
+    fn rational_reconstruct(&self) -> Self::Output {
+        let mut v=(M::VALUE as i64, 0);
+        let mut w=(self.val() as i64, 1);
+        while w.0*w.0*2>M::VALUE as i64 {
+            let q=v.0/w.0;
+            let z=(v.0-q*w.0, v.1-q*w.1);
+            v=w;
+            w=z;
+        }
+        w.0 as f64 / w.1 as f64
+    }
+}
+
+impl<I> RationalReconstruct for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    type Output = f64;
+    fn rational_reconstruct(&self) -> Self::Output {
+        let mut v=(Self::modulus() as i64, 0);
+        let mut w=(self.val() as i64, 1);
+        while w.0*w.0*2>Self::modulus() as i64 {
+            let q=v.0/w.0;
+            let z=(v.0-q*w.0, v.1-q*w.1);
+            v=w;
+            w=z;
+        }
+        w.0 as f64 / w.1 as f64
+    }
+}
+
+impl<T> RationalReconstruct for Vec<T> where T: RationalReconstruct {
+    type Output = Vec<T::Output>;
+    fn rational_reconstruct(&self) -> Self::Output {
+        self.iter().map(|v| v.rational_reconstruct()).collect::<Self::Output>()
+    }
+}
+
 /// プリミティブな整数型についてimplを定義するマクロ
 macro_rules! impl_integer {
     ($($ty:ty),*) => {
