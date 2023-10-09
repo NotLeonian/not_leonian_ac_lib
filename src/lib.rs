@@ -4,7 +4,7 @@
 //! Released under the MIT license  
 //! <https://opensource.org/licenses/mit-license.php>  
 
-/// 1つ以上の変数を1行で出力するマクロ
+/// 1つ以上の値を1行で出力するマクロ
 #[macro_export]
 #[allow(unused_macros)]
 macro_rules! outputln {
@@ -35,6 +35,18 @@ impl<T> Outputln for Vec<T> where T: std::fmt::Display {
     }
 }
 
+impl<T> Outputln for [T] where T: std::fmt::Display {
+    fn outputln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                print!("{} ",&var);
+            } else {
+                println!("{}",&var);
+            }
+        }
+    }
+}
+
 impl<T, const N: usize> Outputln for [T;N] where T: Sized + std::fmt::Display {
     fn outputln(&self) {
         for (i,var) in self.iter().enumerate() {
@@ -54,6 +66,14 @@ pub trait Outputlns {
 }
 
 impl<T> Outputlns for Vec<T> where T: Outputln {
+    fn outputlns(&self) {
+        for v in self {
+            v.outputln();
+        }
+    }
+}
+
+impl<T> Outputlns for [T] where T: Outputln {
     fn outputlns(&self) {
         for v in self {
             v.outputln();
@@ -101,7 +121,7 @@ impl OutputValOr for usize {
     }
 }
 
-/// 1つ以上の変数を1行でstderrに出力するマクロ
+/// 1つ以上の値を1行でstderrに出力するマクロ
 #[macro_export]
 #[allow(unused_macros)]
 macro_rules! eoutputln {
@@ -132,6 +152,18 @@ impl<T> Eoutputln for Vec<T> where T: std::fmt::Display {
     }
 }
 
+impl<T> Eoutputln for [T] where T: std::fmt::Display {
+    fn eoutputln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                eprint!("{} ",&var);
+            } else {
+                eprintln!("{}",&var);
+            }
+        }
+    }
+}
+
 impl<T, const N: usize> Eoutputln for [T;N] where T: Sized + std::fmt::Display {
     fn eoutputln(&self) {
         for (i,var) in self.iter().enumerate() {
@@ -151,6 +183,14 @@ pub trait Eoutputlns {
 }
 
 impl<T> Eoutputlns for Vec<T> where T: Eoutputln {
+    fn eoutputlns(&self) {
+        for v in self {
+            v.eoutputln();
+        }
+    }
+}
+
+impl<T> Eoutputlns for [T] where T: Eoutputln {
     fn eoutputlns(&self) {
         for v in self {
             v.eoutputln();
@@ -924,6 +964,102 @@ pub fn linear_sieve<T>(nmax: T) -> (Vec<T>,Vec<T>) where T: Primes {
     T::linear_sieve(nmax)
 }
 
+/// 2つ以上の数の最大公約数を返すマクロ
+#[macro_export]
+#[allow(unused_macros)]
+macro_rules! gcd {
+    ($l:expr,$r:expr) => {
+        num_integer::gcd($l,$r)
+    };
+    ($l:expr,$r:expr,$($vars:expr),+) => {
+        num_integer::gcd($l,gcd!($r,$($vars),+))
+    };
+}
+
+/// 配列やベクターの中身の最大公約数をとるトレイト
+pub trait VecGCD where Self: std::ops::Index<usize> {
+    /// 配列やベクターの中身の最大公約数を返す関数
+    fn gcd(&self) -> Self::Output;
+}
+
+impl<T> VecGCD for Vec<T> where T: Copy + num::Zero + num_integer::Integer {
+    fn gcd(&self) -> T {
+        let mut gcd=num::zero();
+        for &var in self {
+            gcd=num_integer::gcd(gcd, var);
+        }
+        gcd
+    }
+}
+
+impl<T> VecGCD for [T] where T: Copy + num::Zero + num_integer::Integer {
+    fn gcd(&self) -> T {
+        let mut gcd=num::zero();
+        for &var in self {
+            gcd=num_integer::gcd(gcd, var);
+        }
+        gcd
+    }
+}
+
+impl<T, const N: usize> VecGCD for [T;N] where T: Copy + num::Zero + num_integer::Integer {
+    fn gcd(&self) -> T {
+        let mut gcd=num::zero();
+        for &var in self {
+            gcd=num_integer::gcd(gcd, var);
+        }
+        gcd
+    }
+}
+
+/// 2つ以上の数の最小公倍数を返すマクロ
+#[macro_export]
+#[allow(unused_macros)]
+macro_rules! lcm {
+    ($l:expr,$r:expr) => {
+        num_integer::lcm($l,$r)
+    };
+    ($l:expr,$r:expr,$($vars:expr),+) => {
+        num_integer::lcm($l,lcm!($r,$($vars),+))
+    };
+}
+
+/// 配列やベクターの中身の最小公倍数をとるトレイト
+pub trait VecLCM where Self: std::ops::Index<usize> {
+    /// 配列やベクターの中身の最小公倍数を返す関数
+    fn lcm(&self) -> Self::Output;
+}
+
+impl<T> VecLCM for Vec<T> where T: Copy + num::One + num_integer::Integer {
+    fn lcm(&self) -> T {
+        let mut lcm=num::one();
+        for &var in self {
+            lcm=num_integer::lcm(lcm, var);
+        }
+        lcm
+    }
+}
+
+impl<T> VecLCM for [T] where T: Copy + num::One + num_integer::Integer {
+    fn lcm(&self) -> T {
+        let mut lcm=num::one();
+        for &var in self {
+            lcm=num_integer::lcm(lcm, var);
+        }
+        lcm
+    }
+}
+
+impl<T, const N: usize> VecLCM for [T;N] where T: Copy + num::One + num_integer::Integer {
+    fn lcm(&self) -> T {
+        let mut lcm=num::one();
+        for &var in self {
+            lcm=num_integer::lcm(lcm, var);
+        }
+        lcm
+    }
+}
+
 /// N1×N2行列の構造体（num::powで行列累乗を計算できる）
 #[derive(Clone, std::fmt::Debug)]
 pub struct Matrix<T, const N1: usize, const N2: usize> {
@@ -1578,3 +1714,5 @@ macro_rules! tests {
         )*
     };
 }
+
+// not_leonian_ac_lib until this line
