@@ -1,5 +1,6 @@
 # not_leonian_ac_lib
 AtCoderのためのRustの自作ライブラリです。src/lib.rsとrust.jsonc（とsrc/main.rs）からなります。
+提出した後のコンパイルは結構長いです。
 
 ## src/lib.rs
 ライブラリです。「cargo doc --open」で実装している内容の詳細を確認できます。
