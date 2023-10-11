@@ -10,6 +10,9 @@ AtCoderのためのRustの自作ライブラリです。src/lib.rsとrust.jsonc�
 
 ## src/main.rs
 main関数です。
-Cargo.tomlのdependenciesにこのライブラリを入れ、実際にAtCoderに提出するときは「\#\[allow\(unused\_attributes\)\] \#\[macro\_use\] \#\[allow\(unused\_imports\)\] use not\_leonian\_ac\_lib::\*;」を削除してsrc/lib.rsの後ろに貼り付けて提出すればよいです。
+Cargo.tomlのdependenciesにこのライブラリを入れ、実際にAtCoderに提出するときは以下の行を削除してから、src/lib.rsの後ろに貼り付けて提出すればよいです。
+```rust
+#[allow(unused_attributes)] #[macro_use] #[allow(unused_imports)] use not_leonian_ac_lib::*;
+```
 自動化も容易だと思います。
 クレート分割した理由としては、結合テストがしやすく保守性が高まることとともに、事前コンパイルができることが挙げられます。

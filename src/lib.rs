@@ -1608,15 +1608,9 @@ impl ToDecimal for String {
 }
 
 /// 2進法での桁数を求めるトレイト
-pub trait BinaryLen {
+pub trait BitDigits {
     /// 2進法での桁数を求める関数
-    fn binary_len(self) -> usize;
-}
-
-impl BinaryLen for usize {
-    fn binary_len(self) -> usize {
-        self.ilog2() as usize
-    }
+    fn bit_digits(self) -> usize;
 }
 
 /// 素数位数の有限体の元で表された有理数を推測するトレイト
@@ -1689,6 +1683,12 @@ macro_rules! impl_integer {
             impl One for $ty {
                 fn one_val() -> Self {
                     1
+                }
+            }
+
+            impl BitDigits for $ty {
+                fn bit_digits(self) -> usize {
+                    self.ilog2() as usize
                 }
             }
         )*
