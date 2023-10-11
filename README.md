@@ -15,4 +15,4 @@ Cargo.tomlのdependenciesにこのライブラリを入れ、実際にAtCoderに
 #[allow(unused_attributes)] #[macro_use] #[allow(unused_imports)] use not_leonian_ac_lib::*;
 ```
 自動化も容易だと思います。
-クレート分割した理由としては、結合テストがしやすく保守性が高まることとともに、事前コンパイルができることが挙げられます。
+クレート分割した理由としては、結合テストがしやすく保守性が高まることとともに、ローカルでは事前コンパイルができることが挙げられます。

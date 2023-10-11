@@ -1613,6 +1613,21 @@ pub trait BitDigits {
     fn bit_digits(self) -> usize;
 }
 
+/// 10のi乗のstatic定数
+#[allow(dead_code)]
+pub static E: [usize;19]=gen_e();
+
+/// 10のi乗のstatic定数を生成するconst関数
+const fn gen_e() -> [usize;19] {
+    let mut e=[1;19];
+    let mut i=1;
+    while i<19 {
+        e[i]=e[i-1]*10;
+        i+=1;
+    }
+    e
+}
+
 /// 素数位数の有限体の元で表された有理数を推測するトレイト
 pub trait RationalReconstruct {
     /// 関数の返り値の型
@@ -1697,7 +1712,7 @@ macro_rules! impl_integer {
 
 impl_integer!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
-/// 結合テスト用
+/// 結合テスト用（AtCoderの環境に含まれないクレートを使用していることに注意）
 #[macro_export]
 #[allow(unused_macros)]
 macro_rules! tests {
