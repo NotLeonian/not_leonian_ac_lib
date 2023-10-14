@@ -610,20 +610,20 @@ pub struct RevBinaryHeap<T> where T: Ord {
 }
 
 impl<T> RevBinaryHeap<T> where T: Ord {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { binary_heap: std::collections::BinaryHeap::<std::cmp::Reverse<T>>::new() }
     }
-    fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.binary_heap.is_empty()
     }
     #[allow(dead_code)]
-    fn len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.binary_heap.len()
     }
-    fn push(&mut self, item: T) {
+    pub fn push(&mut self, item: T) {
         self.binary_heap.push(std::cmp::Reverse(item));
     }
-    fn pop(&mut self) -> Option<T> {
+    pub fn pop(&mut self) -> Option<T> {
         if !self.is_empty() {
             let std::cmp::Reverse(ret)=self.binary_heap.pop().unwrap();
             Some(ret)
@@ -632,7 +632,7 @@ impl<T> RevBinaryHeap<T> where T: Ord {
         }
     }
     #[allow(dead_code)]
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.binary_heap.clear();
     }
 }
