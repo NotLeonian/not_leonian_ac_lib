@@ -440,6 +440,10 @@ pub trait Graph where Self: Sized {
     }
     /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）（到達不能ならばusize::MAXが入る）
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
+    /// グラフからUnion-Find木を構築する関数（0-indexed）
+    fn construct_union_find(&self) -> ac_library::Dsu;
+    /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値の型はOption<Vec<bool>>）
+    fn is_bipartite_graph(&self) -> Option<Vec<bool>>;
 }
 
 impl Graph for VecGraph {
@@ -487,6 +491,29 @@ impl Graph for VecGraph {
         }
         dist
     }
+    fn construct_union_find(&self) -> ac_library::Dsu {
+        let mut uf=ac_library::Dsu::new(self.size());
+        for v in 0..self.size() {
+            for &(u,_) in &self[v] {
+                uf.merge(v, u);
+            }
+        }
+        uf
+    }
+    fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
+        let mut ts=ac_library::TwoSat::new(self.size());
+        for v in 0..self.size() {
+            for &(u,_) in &self[v] {
+                ts.add_clause(v, true, u, true);
+                ts.add_clause(v, false, u, false);
+            }
+        }
+        if ts.satisfiable() {
+            Some(ts.answer().to_vec())
+        } else {
+            None
+        }
+    }
 }
 
 impl Graph for SetGraph {
@@ -533,6 +560,29 @@ impl Graph for SetGraph {
             }
         }
         dist
+    }
+    fn construct_union_find(&self) -> ac_library::Dsu {
+        let mut uf=ac_library::Dsu::new(self.size());
+        for v in 0..self.size() {
+            for &(u,_) in &self[v] {
+                uf.merge(v, u);
+            }
+        }
+        uf
+    }
+    fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
+        let mut ts=ac_library::TwoSat::new(self.size());
+        for v in 0..self.size() {
+            for &(u,_) in &self[v] {
+                ts.add_clause(v, true, u, true);
+                ts.add_clause(v, false, u, false);
+            }
+        }
+        if ts.satisfiable() {
+            Some(ts.answer().to_vec())
+        } else {
+            None
+        }
     }
 }
 
