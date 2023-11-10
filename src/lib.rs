@@ -6,7 +6,6 @@
 
 /// 1つ以上の値を1行で出力するマクロ
 #[macro_export]
-#[allow(unused_macros)]
 macro_rules! outputln {
     ($var:expr) => {
         println!("{}",$var);
@@ -90,7 +89,6 @@ impl<T, const N: usize> Outputlns for [T;N] where T: Sized + Outputln {
 }
 
 /// 条件によって変わる1行を出力する関数（引数は順に条件と真の場合、偽の場合の出力）
-#[allow(dead_code)]
 pub fn outputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
     if cond {
         println!("{}",ok);
@@ -100,7 +98,6 @@ pub fn outputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display,
 }
 
 /// 条件によって"Yes"または"No"の1行を出力する関数
-#[allow(dead_code)]
 pub fn output_yes_or_no(cond: bool) {
     outputif(cond, "Yes", "No");
 }
@@ -123,7 +120,6 @@ impl OutputValOr for usize {
 
 /// 1つ以上の値を1行でstderrに出力するマクロ
 #[macro_export]
-#[allow(unused_macros)]
 macro_rules! eoutputln {
     ($var:expr) => {
         eprintln!("{}",$var);
@@ -207,7 +203,6 @@ impl<T, const N: usize> Eoutputlns for [T;N] where T: Sized + Eoutputln {
 }
 
 /// 条件によって変わる1行をstderrに出力する関数（引数は順に条件と真の場合、偽の場合の出力）
-#[allow(dead_code)]
 pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
     if cond {
         eprintln!("{}",ok);
@@ -217,7 +212,6 @@ pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display
 }
 
 /// 条件によって"Yes"または"No"の1行をstderrに出力する関数
-#[allow(dead_code)]
 pub fn eoutput_yes_or_no(cond: bool) {
     eoutputif(cond, "Yes", "No");
 }
@@ -258,7 +252,6 @@ impl<T> MoveRight for Vec<T> where T: Clone {
 }
 
 /// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
-#[allow(dead_code)]
 pub fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
     (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
 }
@@ -276,7 +269,6 @@ pub trait Isize {
 }
 
 /// min関数
-#[allow(dead_code)]
 pub fn min<T>(left: T, right: T) -> T where T: PartialOrd {
     if left<right {
         left
@@ -286,7 +278,6 @@ pub fn min<T>(left: T, right: T) -> T where T: PartialOrd {
 }
 
 /// max関数
-#[allow(dead_code)]
 pub fn max<T>(left: T, right: T) -> T where T: PartialOrd {
     if left>right {
         left
@@ -386,10 +377,8 @@ impl<T> ChminChmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: 
 }
 
 /// 2次元ベクターによるグラフの型
-#[allow(dead_code)]
 pub type VecGraph=Vec<Vec<(usize,usize)>>;
 /// BTreeSetのベクターによるグラフの型
-#[allow(dead_code)]
 pub type SetGraph=Vec<std::collections::BTreeSet<(usize,usize)>>;
 
 /// グラフについてのトレイト ((usize,usize)の2次元ベクターと(usize,usize)のBTreeSetのベクターについて実装)
@@ -442,7 +431,7 @@ pub trait Graph where Self: Sized {
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
     /// グラフからUnion-Find木を構築する関数（0-indexed）
     fn construct_union_find(&self) -> ac_library::Dsu;
-    /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値の型はOption<Vec<bool>>）
+    /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値の型は`Option<Vec<bool>>`）
     fn is_bipartite_graph(&self) -> Option<Vec<bool>>;
 }
 
@@ -587,31 +576,26 @@ impl Graph for SetGraph {
 }
 
 /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-#[allow(dead_code)]
 pub fn construct_graph<G>(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> G where G: Graph {
     G::construct_graph(n, m, ab)
 }
 
 /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-#[allow(dead_code)]
 pub fn construct_directed_graph<G>(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> G where G: Graph {
     G::construct_directed_graph(n, m, ab)
 }
 
 /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-#[allow(dead_code)]
 pub fn construct_weighted_graph<G>(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> G where G: Graph {
     G::construct_weighted_graph(n, m, abw)
 }
 
 /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-#[allow(dead_code)]
 pub fn construct_weighted_directed_graph<G>(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> G where G: Graph {
     G::construct_weighted_directed_graph(n, m, abw)
 }
 
 /// 二分探索の関数（整数）
-#[allow(dead_code)]
 pub fn binary_search<F>(ok: isize, bad: isize, determine: F) -> isize where F: Fn(isize) -> bool {
     let right=ok>bad;
     let mut ok=ok;
@@ -632,7 +616,6 @@ pub fn binary_search<F>(ok: isize, bad: isize, determine: F) -> isize where F: F
 }
 
 /// 二分探索の関数（浮動小数点数）
-#[allow(dead_code)]
 pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 where F: Fn(f64) -> bool {
     let right=ok>bad;
     let mut ok=ok;
@@ -653,7 +636,6 @@ pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f
 }
 
 /// 最小値を取り出すことのできる優先度つきキューの構造体
-#[allow(dead_code)]
 #[derive(Clone, Default, std::fmt::Debug)]
 pub struct RevBinaryHeap<T> where T: Ord {
     binary_heap: std::collections::BinaryHeap<std::cmp::Reverse<T>>
@@ -666,7 +648,6 @@ impl<T> RevBinaryHeap<T> where T: Ord {
     pub fn is_empty(&self) -> bool {
         self.binary_heap.is_empty()
     }
-    #[allow(dead_code)]
     pub fn len(&self) -> usize {
         self.binary_heap.len()
     }
@@ -681,7 +662,14 @@ impl<T> RevBinaryHeap<T> where T: Ord {
             None
         }
     }
-    #[allow(dead_code)]
+    pub fn peek(&self) -> Option<&T> {
+        if !self.is_empty() {
+            let std::cmp::Reverse(ret)=self.binary_heap.peek().unwrap();
+            Some(ret)
+        } else {
+            None
+        }
+    }
     pub fn clear(&mut self) {
         self.binary_heap.clear();
     }
@@ -754,7 +742,6 @@ impl<I> ModIntInv for ac_library::DynamicModInt<I> where I: ac_library::Id {
 }
 
 /// ModIntの逆元をベクターで列挙する関数（最初の要素には0が入る）
-#[allow(dead_code)]
 pub fn construct_modint_inverses<M>(nmax: usize) -> Vec<M> where M: ModIntInv {
     ModIntInv::construct_modint_inverses(nmax)
 }
@@ -804,13 +791,11 @@ impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
 }
 
 /// ModIntの階乗をベクターで列挙する関数
-#[allow(dead_code)]
 pub fn construct_modint_facts<M>(nmax: usize) -> Vec<M> where M: ModIntFact {
     M::construct_modint_facts(nmax)
 }
 
 /// ModIntの階乗の逆元をベクターで列挙する関数
-#[allow(dead_code)]
 pub fn construct_modint_fact_inverses<M>(nmax: usize, invs: &Vec<M>) -> Vec<M> where M: ModIntFact {
     M::construct_modint_fact_inverses(nmax, invs)
 }
@@ -1003,20 +988,17 @@ impl Primes for usize {
 }
 
 /// エラトステネスの篩で素数を列挙する関数
-#[allow(dead_code)]
 pub fn sieve_of_eratosthenes<T>(nmax: T) -> Vec<bool> where T: Primes {
     T::sieve_of_eratosthenes(nmax)
 }
 
 /// 線形篩で最小素因数を列挙する関数
-#[allow(dead_code)]
 pub fn linear_sieve<T>(nmax: T) -> (Vec<T>,Vec<T>) where T: Primes {
     T::linear_sieve(nmax)
 }
 
 /// 2つ以上の数の最大公約数を返すマクロ
 #[macro_export]
-#[allow(unused_macros)]
 macro_rules! gcd {
     ($l:expr,$r:expr) => {
         num_integer::gcd($l,$r)
@@ -1064,7 +1046,6 @@ impl<T, const N: usize> VecGCD for [T;N] where T: Copy + num::Zero + num_integer
 
 /// 2つ以上の数の最小公倍数を返すマクロ
 #[macro_export]
-#[allow(unused_macros)]
 macro_rules! lcm {
     ($l:expr,$r:expr) => {
         num_integer::lcm($l,$r)
@@ -1107,6 +1088,24 @@ impl<T, const N: usize> VecLCM for [T;N] where T: Copy + num::One + num_integer:
             lcm=num_integer::lcm(lcm, var);
         }
         lcm
+    }
+}
+
+/// 区間のそれぞれの要素にアフィン変換を行う遅延セグ木の構造体
+pub struct SegmentAffineTransform<M>(std::marker::PhantomData<M>) where M: ac_library::Monoid;
+
+/// 区間のそれぞれの要素にアフィン変換を行う遅延セグ木のトレイト
+impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output = M::S> + std::ops::Mul<Output = M::S> + Zero + One {
+    type M = M;
+    type F = (M::S,M::S);
+    fn identity_map() -> Self::F {
+        (M::S::one_val(),<M as ac_library::Monoid>::S::zero_val())
+    }
+    fn mapping(f: &Self::F, x: &<Self::M as ac_library::Monoid>::S) -> <Self::M as ac_library::Monoid>::S {
+        f.0.clone()*x.clone()+f.1.clone()
+    }
+    fn composition(f: &Self::F, g: &Self::F) -> Self::F {
+        (f.0.clone()*g.0.clone(),f.0.clone()*g.1.clone()+f.1.clone())
     }
 }
 
@@ -1664,7 +1663,6 @@ pub trait BitDigits {
 }
 
 /// 10のi乗のstatic定数
-#[allow(dead_code)]
 pub static E: [usize;19]=gen_e();
 
 /// 10のi乗のstatic定数を生成するconst関数
@@ -1764,7 +1762,6 @@ impl_integer!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 /// 結合テスト用（AtCoderの環境に含まれないクレートを使用していることに注意）
 #[macro_export]
-#[allow(unused_macros)]
 macro_rules! tests {
     ($name:expr,$($num:expr,$input:expr,$output:expr),*) => {
         $(
