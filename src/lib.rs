@@ -378,10 +378,10 @@ impl<T> ChminChmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: 
 
 /// 2次元ベクターによるグラフの型
 pub type VecGraph=Vec<Vec<(usize,usize)>>;
-/// BTreeSetのベクターによるグラフの型
-pub type SetGraph=Vec<std::collections::BTreeSet<(usize,usize)>>;
+/// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
+pub type MapGraph=Vec<std::collections::BTreeMap<usize,usize>>;
 
-/// グラフについてのトレイト ((usize,usize)の2次元ベクターと(usize,usize)のBTreeSetのベクターについて実装)
+/// グラフについてのトレイト ((usize,usize)の2次元ベクターと(usize,usize)のBTreeMapのベクターについて実装)
 pub trait Graph where Self: Sized {
     /// グラフを初期化する関数
     fn new(n: usize) -> Self;
@@ -427,12 +427,16 @@ pub trait Graph where Self: Sized {
         }
         g
     }
+    /// 頂点aから頂点bへの辺があるかどうかを判定し、辺があれば重みを返す関数（返り値の型は`Option<usize>`）（VecGraphの場合の使用は非推奨）
+    fn weight(&self, a: usize, b: usize) -> Option<usize>;
     /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）（到達不能ならばusize::MAXが入る）
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
     /// グラフからUnion-Find木を構築する関数（0-indexed）
     fn construct_union_find(&self) -> ac_library::Dsu;
     /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値の型は`Option<Vec<bool>>`）
     fn is_bipartite_graph(&self) -> Option<Vec<bool>>;
+    /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
+    fn pruefer_code(&self) -> Vec<usize>;
 }
 
 impl Graph for VecGraph {
@@ -445,6 +449,14 @@ impl Graph for VecGraph {
     fn push(&mut self, a: usize, b: usize, w: usize) {
         self[a].push((b,w));
     }
+    fn weight(&self, a: usize, b: usize) -> Option<usize> {
+        for &(u,w) in &self[a] {
+            if u==b {
+                return Some(w);
+            }
+        }
+        None
+    }
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
         let mut dist=vec![usize::MAX;self.size()];
         dist[start]=0;
@@ -503,17 +515,54 @@ impl Graph for VecGraph {
             None
         }
     }
+    fn pruefer_code(&self) -> Vec<usize> {
+        let n=self.size();
+        let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
+        let mut d=vec![0;n];
+        for v in 0..n {
+            for &(u,_) in &self[v] {
+                adjacency_list[v].insert(u);
+                d[v]+=1;
+            }
+        }
+        let mut leaves=RevBinaryHeap::<usize>::new();
+        for v in 0..n {
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let mut pc=vec![0;n-2];
+        for i in 0..n-2 {
+            let v=leaves.pop().unwrap();
+            let u=adjacency_list[v].pop_first().unwrap();
+            pc[i]=u;
+            adjacency_list[u].remove(&v);
+            d[v]-=1;
+            d[u]-=1;
+            if d[u]==1 {
+                leaves.push(u);
+            }
+        }
+        pc
+    }
 }
 
-impl Graph for SetGraph {
+impl Graph for MapGraph {
     fn new(n: usize) -> Self {
-        vec![std::collections::BTreeSet::<(usize,usize)>::new();n]
+        vec![std::collections::BTreeMap::<usize,usize>::new();n]
     }
     fn size(&self) -> usize {
         self.len()
     }
     fn push(&mut self, a: usize, b: usize, w: usize) {
-        self[a].insert((b,w));
+        self[a].insert(b,w);
+    }
+    fn weight(&self, a: usize, b: usize) -> Option<usize> {
+        if self[a].contains_key(&b) {
+            Some(self[a][&b])
+        } else {
+            None
+        }
     }
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
         let mut dist=vec![usize::MAX;self.size()];
@@ -525,7 +574,7 @@ impl Graph for SetGraph {
                 if dist[v]<d {
                     continue;
                 }
-                for &(u,w) in &self[v] {
+                for (&u,&w) in &self[v] {
                     if dist[v]+w<dist[u] {
                         dist[u]=dist[v]+w;
                         pq.push((dist[u],u));
@@ -538,7 +587,7 @@ impl Graph for SetGraph {
             let mut queue=std::collections::VecDeque::<usize>::new();
             queue.push_back(0);
             while let Some(v)=queue.pop_front() {
-                for &(u,w) in &self[v] {
+                for (&u,&w) in &self[v] {
                     debug_assert_eq!(w, 1);
                     if !seen[u] {
                         dist[u]=dist[v]+w;
@@ -553,7 +602,7 @@ impl Graph for SetGraph {
     fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
         for v in 0..self.size() {
-            for &(u,_) in &self[v] {
+            for (&u,_) in &self[v] {
                 uf.merge(v, u);
             }
         }
@@ -562,7 +611,7 @@ impl Graph for SetGraph {
     fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
         let mut ts=ac_library::TwoSat::new(self.size());
         for v in 0..self.size() {
-            for &(u,_) in &self[v] {
+            for (&u,_) in &self[v] {
                 ts.add_clause(v, true, u, true);
                 ts.add_clause(v, false, u, false);
             }
@@ -572,6 +621,36 @@ impl Graph for SetGraph {
         } else {
             None
         }
+    }
+    fn pruefer_code(&self) -> Vec<usize> {
+        let n=self.size();
+        let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
+        let mut d=vec![0;n];
+        for v in 0..n {
+            for (&u,_) in &self[v] {
+                adjacency_list[v].insert(u);
+                d[v]+=1;
+            }
+        }
+        let mut leaves=RevBinaryHeap::<usize>::new();
+        for v in 0..n {
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let mut pc=vec![0;n-2];
+        for i in 0..n-2 {
+            let v=leaves.pop().unwrap();
+            let u=adjacency_list[v].pop_first().unwrap();
+            pc[i]=u;
+            adjacency_list[u].remove(&v);
+            d[v]-=1;
+            d[u]-=1;
+            if d[u]==1 {
+                leaves.push(u);
+            }
+        }
+        pc
     }
 }
 
@@ -854,6 +933,19 @@ impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + Zero + std::ops::Add<Ou
         debug_assert!(r_j <= self[0].len());
         self[r_i][r_j].clone()-self[r_i][l_j].clone()-self[l_i][r_j].clone()+self[l_i][l_j].clone()
     }
+}
+
+/// 0以上max-1以下の整数の重複順列を全列挙する関数
+pub fn permutations_with_replacement(max: usize, len: usize) -> Vec<Vec<usize>> {
+    let mut ret=vec![vec![0;len];max.pow(len as u32)];
+    for seq in 0..max.pow(len as u32) {
+        let mut val=seq;
+        for i in 0..len {
+            ret[seq][i]=val%max;
+            val/=max;
+        }
+    }
+    ret
 }
 
 /// 素数に関するトレイト
@@ -1516,6 +1608,42 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         let mut h=self.clone();
         h.fps_pow_assign(k);
         h
+    }
+}
+
+/// プリューファーコードのトレイト
+pub trait PrueferCode {
+    /// プリューファーコードの表すラベルつき木を返す関数（0-indexed）
+    fn labeled_tree<G>(&self) -> G where G: Graph;
+}
+
+impl PrueferCode for Vec<usize> {
+    fn labeled_tree<G>(&self) -> G where G: Graph {
+        let n=self.len()+2;
+        let mut d=vec![1;n];
+        let mut leaves=RevBinaryHeap::<usize>::new();
+        for &v in self {
+            d[v]+=1;
+        }
+        for v in 0..n {
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let mut ab=Vec::<(usize,usize)>::new();
+        for &v in self {
+            let u=leaves.pop().unwrap();
+            ab.push((v,u));
+            d[v]-=1;
+            d[u]-=1;
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let v=leaves.pop().unwrap();
+        let u=leaves.pop().unwrap();
+        ab.push((v,u));
+        construct_graph(n, n-1, &ab)
     }
 }
 
