@@ -307,72 +307,92 @@ impl<T> ChminChmax for T where T: Clone + PartialOrd {
     }
 }
 
-/// 1次元ベクターについてのchminとchmaxのトレイト
-pub trait ChminChmaxVec where Self: std::ops::Index<usize> {
-    /// ベクターの中身について、添字challengerの値のほうが小さければ上書きする関数
-    fn chmin_vec(&mut self, index: usize, challenger: usize);
-    /// ベクターの中身について、添字challengerの値のほうが大きければ上書きする関数
-    fn chmax_vec(&mut self, index: usize, challenger: usize);
+/// 2数の絶対差を返す関数
+pub fn abs_diff<T>(a: T, b: T) -> T where T: Copy + std::ops::Sub<Output=T> + PartialOrd {
+    max(a,b)-min(a,b)
 }
 
-impl<T> ChminChmaxVec for Vec<T> where T: Clone + PartialOrd {
-    fn chmin_vec(&mut self, index: usize, challenger: usize) {
-        if self[challenger]<self[index] {
-            self[index]=self[challenger].clone();
-        }
-    }
-    fn chmax_vec(&mut self, index: usize, challenger: usize) {
-        if self[challenger]>self[index] {
-            self[index]=self[challenger].clone();
-        }
-    }
+/// 配列やベクターの最小値の添字を返すトレイト
+pub trait MinIndex {
+    /// 配列やベクターの最小値の添字を返す関数（最小値が複数存在する場合は最小の添字）
+    fn min_index(&self) -> usize;
 }
 
-impl<T, const N: usize> ChminChmaxVec for [T;N] where T: Clone + PartialOrd {
-    fn chmin_vec(&mut self, index: usize, challenger: usize) {
-        if self[challenger]<self[index] {
-            self[index]=self[challenger].clone();
+impl<T> MinIndex for Vec<T> where T: PartialOrd {
+    fn min_index(&self) -> usize {
+        let mut index=0;
+        for i in 1..self.len() {
+            if self[i]<self[index] {
+                index=i;
+            }
         }
-    }
-    fn chmax_vec(&mut self, index: usize, challenger: usize) {
-        if self[challenger]>self[index] {
-            self[index]=self[challenger].clone();
-        }
+        index
     }
 }
 
-/// 添字についてchminとchmaxを行うトレイト
-pub trait ChminChmaxIndex<T> where T: std::ops::Index<Self>, T::Output: PartialOrd {
-    /// vecの現在の添字の値よりchallengerの値のほうが小さければchallengerで上書きする関数
-    fn chmin_index(&mut self, vec: &T, challenger: Self);
-    /// vecの現在の添字の値よりchallengerの値のほうが大きければchallengerで上書きする関数
-    fn chmax_index(&mut self, vec: &T, challenger: Self);
-    /// vecの現在の添字の値よりchallengerの値のほうが大きくなければchallengerで上書きする関数
-    fn chmineq_index(&mut self, vec: &T, challenger: Self);
-    /// vecの現在の添字の値よりchallengerの値のほうが小さくなければchallengerで上書きする関数
-    fn chmaxeq_index(&mut self, vec: &T, challenger: Self);
+impl<T> MinIndex for [T] where T: PartialOrd {
+    fn min_index(&self) -> usize {
+        let mut index=0;
+        for i in 1..self.len() {
+            if self[i]<self[index] {
+                index=i;
+            }
+        }
+        index
+    }
 }
 
-impl<T> ChminChmaxIndex<T> for usize where T: std::ops::Index<Self>, T::Output: PartialOrd {
-    fn chmin_index(&mut self, vec: &T, challenger: Self) {
-        if vec[challenger]<vec[*self] {
-            *self=challenger;
+impl<T, const N: usize> MinIndex for [T;N] where T: PartialOrd {
+    fn min_index(&self) -> usize {
+        let mut index=0;
+        for i in 1..self.len() {
+            if self[i]<self[index] {
+                index=i;
+            }
         }
+        index
     }
-    fn chmax_index(&mut self, vec: &T, challenger: Self) {
-        if vec[challenger]>vec[*self] {
-            *self=challenger;
+}
+
+/// 配列やベクターの最大値の添字を返すトレイト
+pub trait MaxIndex {
+    /// 配列やベクターの最大値の添字を返す関数（最大値が複数存在する場合は最小の添字）
+    fn max_index(&self) -> usize;
+}
+
+impl<T> MaxIndex for Vec<T> where T: PartialOrd {
+    fn max_index(&self) -> usize {
+        let mut index=0;
+        for i in 1..self.len() {
+            if self[i]>self[index] {
+                index=i;
+            }
         }
+        index
     }
-    fn chmineq_index(&mut self, vec: &T, challenger: Self) {
-        if vec[challenger]<=vec[*self] {
-            *self=challenger;
+}
+
+impl<T> MaxIndex for [T] where T: PartialOrd {
+    fn max_index(&self) -> usize {
+        let mut index=0;
+        for i in 1..self.len() {
+            if self[i]>self[index] {
+                index=i;
+            }
         }
+        index
     }
-    fn chmaxeq_index(&mut self, vec: &T, challenger: Self) {
-        if vec[challenger]>=vec[*self] {
-            *self=challenger;
+}
+
+impl<T, const N: usize> MaxIndex for [T;N] where T: PartialOrd {
+    fn max_index(&self) -> usize {
+        let mut index=0;
+        for i in 1..self.len() {
+            if self[i]>self[index] {
+                index=i;
+            }
         }
+        index
     }
 }
 
@@ -1187,7 +1207,7 @@ impl<T, const N: usize> VecLCM for [T;N] where T: Copy + num::One + num_integer:
 pub struct SegmentAffineTransform<M>(std::marker::PhantomData<M>) where M: ac_library::Monoid;
 
 /// 区間のそれぞれの要素にアフィン変換を行う遅延セグ木のトレイト
-impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output = M::S> + std::ops::Mul<Output = M::S> + Zero + One {
+impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + Zero + One {
     type M = M;
     type F = (M::S,M::S);
     fn identity_map() -> Self::F {
@@ -1387,6 +1407,64 @@ impl Doubling for Vec<Vec<usize>> {
             k+=1;
         }
         start
+    }
+}
+
+/// 重みつきUnion-Findの構造体（重みの型はisize）（0-indexed）
+pub struct WeightedDSU {
+    parents: Vec<isize>,
+    potentials: Vec<isize>
+}
+
+impl WeightedDSU {
+    /// n頂点の重みつきUnion-Findを初期化する関数
+    pub fn new(n: usize) -> Self {
+        WeightedDSU { parents: vec![-1;n], potentials: vec![0;n] }
+    }
+    /// 頂点aの属する連結成分の代表元を返す関数
+    pub fn leader(&mut self, a: usize) -> usize {
+        if self.parents[a]<0 {
+            return a;
+        }
+        let leader=self.leader(self.parents[a] as usize);
+        self.potentials[a]+=self.potentials[self.parents[a] as usize];
+        self.parents[a]=leader as isize;
+        return leader;
+    }
+    /// 頂点a,bが連結かどうかを返す関数
+    pub fn same(&mut self, a: usize, b: usize) -> bool {
+        self.leader(a)==self.leader(b)
+    }
+    /// 頂点aのポテンシャルを返す関数
+    pub fn potential(&mut self, a: usize) -> isize {
+        self.leader(a);
+        self.potentials[a]
+    }
+    /// 頂点aのポテンシャルから頂点bのポテンシャルを引いた値を返す関数
+    pub fn dist(&mut self, a: usize, b: usize) -> isize {
+        self.potential(a)-self.potential(b)
+    }
+    /// 現在のグラフと無矛盾である場合、頂点aと頂点bを連結にしてself.dist(a,b)の値をdistにする関数（返り値は現在のグラフと無矛盾であるかどうか）
+    pub fn merge(&mut self, mut a: usize, mut b: usize, mut dist: isize) -> bool {
+        dist+=self.potential(b)-self.potential(a);
+        a=self.leader(a);
+        b=self.leader(b);
+        if a==b {
+            return dist==0;
+        }
+        if self.parents[a]<self.parents[b] {
+            std::mem::swap(&mut a, &mut b);
+            dist*=-1;
+        }
+        self.parents[b]+=self.parents[a];
+        self.parents[a]=b as isize;
+        self.potentials[a]=dist;
+        true
+    }
+    /// 頂点aの属する連結成分のサイズを返す関数
+    pub fn size(&mut self, a: usize) -> usize {
+        let leader=self.leader(a);
+        (-self.parents[leader]) as usize
     }
 }
 
