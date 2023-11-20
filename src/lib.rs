@@ -232,6 +232,47 @@ impl EoutputValOr for usize {
     }
 }
 
+/// usizeにキャストするトレイト
+pub trait Usize {
+    /// usizeにキャストする関数
+    fn usize(self) -> usize;
+}
+
+/// isizeにキャストするトレイト
+pub trait Isize {
+    /// isizeにキャストする関数
+    fn isize(self) -> isize;
+}
+
+/// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
+pub trait GetFromLast {
+    /// 配列やベクターに末尾から数えたインデックスでアクセスする関数（1-indexedであることに注意）
+    fn get_from_last(&self, i: usize) -> &Self::Output where Self: std::ops::Index<usize>;
+}
+
+impl<T> GetFromLast for Vec<T> {
+    fn get_from_last(&self, i: usize) -> &<Vec<T> as std::ops::Index<usize>>::Output {
+        &self[self.len()-i]
+    }
+}
+
+impl<T> GetFromLast for [T] {
+    fn get_from_last(&self, i: usize) -> &<[T] as std::ops::Index<usize>>::Output {
+        &self[self.len()-i]
+    }
+}
+
+impl<T, const N: usize> GetFromLast for [T;N] {
+    fn get_from_last(&self, i: usize) -> &<[T;N] as std::ops::Index<usize>>::Output {
+        &self[self.len()-i]
+    }
+}
+
+/// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
+pub fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
+    (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
+}
+
 /// ベクターの先頭にfilledを追加してmだけ右にずらす関数のトレイト
 pub trait MoveRight where Self: std::ops::Index<usize> {
     /// ベクターの先頭にfilledを追加してmだけ右にずらす関数
@@ -251,21 +292,75 @@ impl<T> MoveRight for Vec<T> where T: Clone {
     }
 }
 
-/// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
-pub fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
-    (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
+/// ベクターをソートして重複している要素を取り除く関数のトレイト
+pub trait SortAndDedup {
+    /// ベクターをソートして重複している要素を取り除く関数
+    fn sort_and_dedup(&mut self);
 }
 
-/// usizeにキャストするトレイト
-pub trait Usize {
-    /// usizeにキャストする関数
-    fn usize(self) -> usize;
+impl<T> SortAndDedup for Vec<T> where T: Ord {
+    fn sort_and_dedup(&mut self) {
+        self.sort();
+        self.dedup();
+    }
 }
 
-/// isizeにキャストするトレイト
-pub trait Isize {
-    /// isizeにキャストする関数
-    fn isize(self) -> isize;
+/// 配列やベクターの要素の総和のトレイト
+pub trait Sum<'a> {
+    /// 返り値の型
+    type T;
+    /// 配列やベクターの要素の総和を返す関数
+    fn sum(&'a self) -> Self::T;
+}
+
+impl<'a, T> Sum<'a> for Vec<T> where T: 'a + std::iter::Sum<&'a T> {
+    type T = T;
+    fn sum(&'a self) -> T {
+        <T as std::iter::Sum<&'a T>>::sum(self.iter())
+    }
+}
+
+impl<'a, T> Sum<'a> for [T] where T: 'a + std::iter::Sum<&'a T> {
+    type T = T;
+    fn sum(&'a self) -> T {
+        <T as std::iter::Sum<&'a T>>::sum(self.iter())
+    }
+}
+
+impl<'a, T, const N: usize> Sum<'a> for [T;N] where T: 'a + std::iter::Sum<&'a T> {
+    type T = T;
+    fn sum(&'a self) -> T {
+        <T as std::iter::Sum<&'a T>>::sum(self.iter())
+    }
+}
+
+/// 配列やベクターの要素の総積のトレイト
+pub trait Product<'a> {
+    /// 返り値の型
+    type T;
+    /// 配列やベクターの要素の総積を返す関数
+    fn product(&'a self) -> Self::T;
+}
+
+impl<'a, T> Product<'a> for Vec<T> where T: 'a + std::iter::Product<&'a T> {
+    type T = T;
+    fn product(&'a self) -> T {
+        <T as std::iter::Product<&'a T>>::product(self.iter())
+    }
+}
+
+impl<'a, T> Product<'a> for [T] where T: 'a + std::iter::Product<&'a T> {
+    type T = T;
+    fn product(&'a self) -> T {
+        <T as std::iter::Product<&'a T>>::product(self.iter())
+    }
+}
+
+impl<'a, T, const N: usize> Product<'a> for [T;N] where T: 'a + std::iter::Product<&'a T> {
+    type T = T;
+    fn product(&'a self) -> T {
+        <T as std::iter::Product<&'a T>>::product(self.iter())
+    }
 }
 
 /// min関数
@@ -952,6 +1047,54 @@ impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + Zero + std::ops::Add<Ou
         debug_assert!(r_i <= self.len());
         debug_assert!(r_j <= self[0].len());
         self[r_i][r_j].clone()-self[r_i][l_j].clone()-self[l_i][r_j].clone()+self[l_i][l_j].clone()
+    }
+}
+
+/// ランレングス圧縮のトレイト
+pub trait RunLengthEncoding {
+    /// 配列やベクターをランレングス圧縮して、各要素とその連長の組のベクターを返す関数
+    fn rle(&self) -> Vec<(Self::Output,usize)> where Self: std::ops::Index<usize>, Self::Output: Sized + Clone + PartialEq;
+}
+
+impl<T> RunLengthEncoding for Vec<T> {
+    fn rle(&self) -> Vec<(<Vec<T> as std::ops::Index<usize>>::Output,usize)> where Self: std::ops::Index<usize>, <Vec<T> as std::ops::Index<usize>>::Output: Sized + Clone + PartialEq {
+        let mut rle=Vec::<(<Vec<T> as std::ops::Index<usize>>::Output,usize)>::new();
+        for i in 0..self.len() {
+            if i>0 && self[i]==self[i-1] {
+                rle.last_mut().unwrap().1+=1;
+            } else {
+                rle.push((self[i].clone(),1));
+            }
+        }
+        rle
+    }
+}
+
+impl<T> RunLengthEncoding for [T] {
+    fn rle(&self) -> Vec<(<[T] as std::ops::Index<usize>>::Output,usize)> where Self: std::ops::Index<usize>, <[T] as std::ops::Index<usize>>::Output: Sized + Clone + PartialEq {
+        let mut rle=Vec::<(<[T] as std::ops::Index<usize>>::Output,usize)>::new();
+        for i in 0..self.len() {
+            if i>0 && self[i]==self[i-1] {
+                rle.last_mut().unwrap().1+=1;
+            } else {
+                rle.push((self[i].clone(),1));
+            }
+        }
+        rle
+    }
+}
+
+impl<T, const N: usize> RunLengthEncoding for [T;N] {
+    fn rle(&self) -> Vec<(<[T;N] as std::ops::Index<usize>>::Output,usize)> where Self: std::ops::Index<usize>, <[T;N] as std::ops::Index<usize>>::Output: Sized + Clone + PartialEq {
+        let mut rle=Vec::<(<[T;N] as std::ops::Index<usize>>::Output,usize)>::new();
+        for i in 0..self.len() {
+            if i>0 && self[i]==self[i-1] {
+                rle.last_mut().unwrap().1+=1;
+            } else {
+                rle.push((self[i].clone(),1));
+            }
+        }
+        rle
     }
 }
 
