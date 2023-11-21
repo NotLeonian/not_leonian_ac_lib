@@ -122,9 +122,11 @@ impl OutputValOr for usize {
 #[macro_export]
 macro_rules! eoutputln {
     ($var:expr) => {
+        #[cfg(debug_assertions)]
         eprintln!("{}",$var);
     };
     ($var:expr,$($vars:expr),+) => {
+        #[cfg(debug_assertions)]
         eprint!("{} ",$var);
         eoutputln!($($vars),+);
     };
@@ -138,6 +140,7 @@ pub trait Eoutputln {
 
 impl<T> Eoutputln for Vec<T> where T: std::fmt::Display {
     fn eoutputln(&self) {
+        #[cfg(debug_assertions)]
         for (i,var) in self.iter().enumerate() {
             if i<self.len()-1 {
                 eprint!("{} ",&var);
@@ -150,6 +153,7 @@ impl<T> Eoutputln for Vec<T> where T: std::fmt::Display {
 
 impl<T> Eoutputln for [T] where T: std::fmt::Display {
     fn eoutputln(&self) {
+        #[cfg(debug_assertions)]
         for (i,var) in self.iter().enumerate() {
             if i<self.len()-1 {
                 eprint!("{} ",&var);
@@ -162,6 +166,7 @@ impl<T> Eoutputln for [T] where T: std::fmt::Display {
 
 impl<T, const N: usize> Eoutputln for [T;N] where T: Sized + std::fmt::Display {
     fn eoutputln(&self) {
+        #[cfg(debug_assertions)]
         for (i,var) in self.iter().enumerate() {
             if i<N-1 {
                 eprint!("{} ",&var);
@@ -180,6 +185,7 @@ pub trait Eoutputlns {
 
 impl<T> Eoutputlns for Vec<T> where T: Eoutputln {
     fn eoutputlns(&self) {
+        #[cfg(debug_assertions)]
         for v in self {
             v.eoutputln();
         }
@@ -188,6 +194,7 @@ impl<T> Eoutputlns for Vec<T> where T: Eoutputln {
 
 impl<T> Eoutputlns for [T] where T: Eoutputln {
     fn eoutputlns(&self) {
+        #[cfg(debug_assertions)]
         for v in self {
             v.eoutputln();
         }
@@ -196,6 +203,7 @@ impl<T> Eoutputlns for [T] where T: Eoutputln {
 
 impl<T, const N: usize> Eoutputlns for [T;N] where T: Sized + Eoutputln {
     fn eoutputlns(&self) {
+        #[cfg(debug_assertions)]
         for v in self {
             v.eoutputln();
         }
@@ -204,6 +212,7 @@ impl<T, const N: usize> Eoutputlns for [T;N] where T: Sized + Eoutputln {
 
 /// 条件によって変わる1行をstderrに出力する関数（引数は順に条件と真の場合、偽の場合の出力）
 pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
+    #[cfg(debug_assertions)]
     if cond {
         eprintln!("{}",ok);
     } else {
@@ -213,6 +222,7 @@ pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display
 
 /// 条件によって"Yes"または"No"の1行をstderrに出力する関数
 pub fn eoutput_yes_or_no(cond: bool) {
+    #[cfg(debug_assertions)]
     eoutputif(cond, "Yes", "No");
 }
 
@@ -224,6 +234,7 @@ pub trait EoutputValOr {
 
 impl EoutputValOr for usize {
     fn eoutput_val_or(self, max: Self) {
+        #[cfg(debug_assertions)]
         if self<max {
             eprintln!("{}",self);
         } else {
