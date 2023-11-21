@@ -1364,6 +1364,26 @@ impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library:
     }
 }
 
+/// Nimber（NimのGrundy数）についてのトレイト
+pub trait Nimber {
+    /// Nimber（NimのGrundy数）を求める関数（kが0の場合は個数制限なし、k>0の場合はk個以下の個数制限あり）
+    fn nimber(&self, k: usize) -> usize;
+}
+
+impl Nimber for Vec<usize> {
+    fn nimber(&self, k: usize) -> usize {
+        let mut nimber=0;
+        for &a in self {
+            nimber^=if k==0 {
+                a
+            } else {
+                a%(k+1)
+            };
+        }
+        nimber
+    }
+}
+
 /// データ構造のベクターについてマージテクを行うトレイト（現状はVec、BTreeSet、BinaryHeapにのみ実装）
 pub trait VecWeightedUnionHeuristic {
     /// データ構造のベクターについてマージテクを行う関数（現状はVec、BTreeSet、BinaryHeapにのみ実装）
