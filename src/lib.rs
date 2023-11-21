@@ -1364,6 +1364,78 @@ impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library:
     }
 }
 
+/// データ構造のベクターについてマージテクを行うトレイト（現状はVec、BTreeSet、BinaryHeapにのみ実装）
+pub trait VecWeightedUnionHeuristic {
+    /// データ構造のベクターについてマージテクを行う関数（現状はVec、BTreeSet、BinaryHeapにのみ実装）
+    fn merge(&mut self, from: usize, to: usize);
+}
+
+impl<T> VecWeightedUnionHeuristic for Vec<Vec<T>> {
+    fn merge(&mut self, from: usize, to: usize) {
+        if self[from].len()>self[to].len() {
+            self.swap(from, to);
+        }
+        let tmp=std::mem::take(&mut self[from]);
+        self[to].extend(tmp);
+    }
+}
+
+impl<T> VecWeightedUnionHeuristic for Vec<std::collections::BTreeSet<T>> where std::collections::BTreeSet<T>: Extend<T> {
+    fn merge(&mut self, from: usize, to: usize) {
+        if self[from].len()>self[to].len() {
+            self.swap(from, to);
+        }
+        let tmp=std::mem::take(&mut self[from]);
+        self[to].extend(tmp);
+    }
+}
+
+impl<T> VecWeightedUnionHeuristic for Vec<std::collections::BinaryHeap<T>> where T: Ord {
+    fn merge(&mut self, from: usize, to: usize) {
+        if self[from].len()>self[to].len() {
+            self.swap(from, to);
+        }
+        let tmp=std::mem::take(&mut self[from]);
+        self[to].extend(tmp);
+    }
+}
+
+/// データ構造の組についてマージテクを行うトレイト（現状はVec、BTreeSet、BinaryHeapにのみ実装）
+pub trait WeightedUnionHeuristic {
+    /// データ構造の組についてマージテクを行う関数（現状はVec、BTreeSet、BinaryHeapにのみ実装）
+    fn merge(from: &mut Self, to: &mut Self);
+}
+
+impl<T> WeightedUnionHeuristic for Vec<T> {
+    fn merge(from: &mut Self, to: &mut Self) {
+        if from.len()>to.len() {
+            std::mem::swap(from, to);
+        }
+        let tmp=std::mem::take(from);
+        to.extend(tmp);
+    }
+}
+
+impl<T> WeightedUnionHeuristic for std::collections::BTreeSet<T> where Self: Extend<T> {
+    fn merge(from: &mut Self, to: &mut Self) {
+        if from.len()>to.len() {
+            std::mem::swap(from, to);
+        }
+        let tmp=std::mem::take(from);
+        to.extend(tmp);
+    }
+}
+
+impl<T> WeightedUnionHeuristic for std::collections::BinaryHeap<T> where T: Ord {
+    fn merge(from: &mut Self, to: &mut Self) {
+        if from.len()>to.len() {
+            std::mem::swap(from, to);
+        }
+        let tmp=std::mem::take(from);
+        to.extend(tmp);
+    }
+}
+
 /// N1×N2行列の構造体（num::powで行列累乗を計算できる）
 #[derive(Clone, std::fmt::Debug)]
 pub struct Matrix<T, const N1: usize, const N2: usize> {
