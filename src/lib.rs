@@ -211,6 +211,7 @@ impl<T, const N: usize> Eoutputlns for [T;N] where T: Sized + Eoutputln {
 }
 
 /// 条件によって変わる1行をstderrに出力する関数（引数は順に条件と真の場合、偽の場合の出力）
+#[allow(unused_variables)]
 pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
     #[cfg(debug_assertions)]
     if cond {
@@ -221,6 +222,7 @@ pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display
 }
 
 /// 条件によって"Yes"または"No"の1行をstderrに出力する関数
+#[allow(unused_variables)]
 pub fn eoutput_yes_or_no(cond: bool) {
     #[cfg(debug_assertions)]
     eoutputif(cond, "Yes", "No");
@@ -233,6 +235,7 @@ pub trait EoutputValOr {
 }
 
 impl EoutputValOr for usize {
+    #[allow(unused_variables)]
     fn eoutput_val_or(self, max: Self) {
         #[cfg(debug_assertions)]
         if self<max {

@@ -63,9 +63,9 @@ https://opensource.org/licenses/mit-license.php
     "modint_fact": {
         "prefix": "modint_fact",
         "body": [
-            "let invs=construct_modint_inverses::<${1:ModInt998244353}>(${2:n+1});",
-            "let facts=construct_modint_facts::<${1:ModInt998244353}>(${2:n+1});",
-            "let factinvs=construct_modint_fact_inverses::<${1:ModInt998244353}>(${2:n+1}, &invs);",
+            "let invs=construct_modint_inverses::<${1:ModInt998244353}>(${2:n});",
+            "let facts=construct_modint_facts::<$1>($2);",
+            "let factinvs=construct_modint_fact_inverses::<$1>($2, &invs);",
             "let ncr=|n:usize,r:usize| facts[n]*factinvs[r]*factinvs[n-r];"
         ],
         "description": "ModIntによる階乗と階乗の逆元や二項係数の前計算"
