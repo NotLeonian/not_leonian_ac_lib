@@ -252,10 +252,22 @@ pub trait Usize {
     fn usize(self) -> usize;
 }
 
+impl Usize for bool {
+    fn usize(self) -> usize {
+        self as usize
+    }
+}
+
 /// isizeにキャストするトレイト
 pub trait Isize {
     /// isizeにキャストする関数
     fn isize(self) -> isize;
+}
+
+impl Isize for bool {
+    fn isize(self) -> isize {
+        self as isize
+    }
 }
 
 /// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
@@ -414,11 +426,6 @@ impl<T> ChminChmax for T where T: Clone + PartialOrd {
             *self=challenger;
         }
     }
-}
-
-/// 2数の絶対差を返す関数
-pub fn abs_diff<T>(a: T, b: T) -> T where T: Copy + std::ops::Sub<Output=T> + PartialOrd {
-    max(a,b)-min(a,b)
 }
 
 /// 配列やベクターの最小値の添字を返すトレイト
