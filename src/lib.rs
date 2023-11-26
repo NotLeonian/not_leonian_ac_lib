@@ -294,6 +294,46 @@ impl<T, const N: usize> GetFromLast for [T;N] {
     }
 }
 
+impl<T> GetFromLast for std::collections::VecDeque<T> {
+    fn get_from_last(&self, i: usize) -> &<std::collections::VecDeque<T> as std::ops::Index<usize>>::Output {
+        &self[self.len()-i]
+    }
+}
+
+/// 配列やベクターに末尾から数えたインデックスでmutでアクセスするトレイト
+pub trait GetMutFromLast {
+    /// 配列やベクターに末尾から数えたインデックスでmutでアクセスする関数（1-indexedであることに注意）
+    fn get_mut_from_last(&mut self, i: usize) -> &mut Self::Output where Self: std::ops::Index<usize>;
+}
+
+impl<T> GetMutFromLast for Vec<T> {
+    fn get_mut_from_last(&mut self, i: usize) -> &mut <Vec<T> as std::ops::Index<usize>>::Output {
+        let len=self.len();
+        &mut self[len-i]
+    }
+}
+
+impl<T> GetMutFromLast for [T] {
+    fn get_mut_from_last(&mut self, i: usize) -> &mut <[T] as std::ops::Index<usize>>::Output {
+        let len=self.len();
+        &mut self[len-i]
+    }
+}
+
+impl<T, const N: usize> GetMutFromLast for [T;N] {
+    fn get_mut_from_last(&mut self, i: usize) -> &mut <[T;N] as std::ops::Index<usize>>::Output {
+        let len=self.len();
+        &mut self[len-i]
+    }
+}
+
+impl<T> GetMutFromLast for std::collections::VecDeque<T> {
+    fn get_mut_from_last(&mut self, i: usize) -> &mut <std::collections::VecDeque<T> as std::ops::Index<usize>>::Output {
+        let len=self.len();
+        &mut self[len-i]
+    }
+}
+
 /// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
 pub fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
     (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
@@ -510,6 +550,11 @@ impl<T, const N: usize> MaxIndex for [T;N] where T: PartialOrd {
         }
         index
     }
+}
+
+/// ソートされているベクターどうしを、ソートされた1つのベクターへマージする関数
+pub fn merge_vecs<T>(a: &Vec<T>, b: &Vec<T>) -> Vec<T> where T: Clone + PartialOrd {
+    itertools::Itertools::merge(a.iter(), b.iter()).cloned().collect()
 }
 
 /// 2次元ベクターによるグラフの型
