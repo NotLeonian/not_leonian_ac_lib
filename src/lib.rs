@@ -1071,6 +1071,45 @@ impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + Zero + std::ops::Add<Ou
     }
 }
 
+/// BTreeMapを用いて個数を管理する多重集合についての型
+pub type MultiSet<T>=std::collections::BTreeMap<T, usize>;
+
+/// BTreeMapを用いて個数を管理する多重集合のトレイト
+pub trait MapMultiSet {
+    /// 多重集合で管理する要素の型
+    type T;
+    /// 多重集合に1つvalを追加する関数（返り値は追加した後のvalの個数のOption）
+    fn insert_one(&mut self, val: Self::T) -> Option<usize>;
+    /// 多重集合から1つvalを削除する関数（返り値は削除した後のvalの個数のOption）
+    fn remove_one(&mut self, val: Self::T) -> Option<usize>;
+}
+
+impl<T> MapMultiSet for std::collections::BTreeMap<T, usize> where T: Copy + Ord {
+    type T = T;
+    fn insert_one(&mut self, val: Self::T) -> Option<usize> {
+        if self.contains_key(&val) {
+            self.insert(val, self[&val]+1);
+        } else {
+            self.insert(val, 1);
+        }
+        Some(self[&val])
+    }
+    fn remove_one(&mut self, val: Self::T) -> Option<usize> {
+        if self.contains_key(&val) {
+            if self[&val]>1 {
+                self.insert(val, self[&val]-1);
+                Some(self[&val])
+            } else {
+                self.remove(&val);
+                Some(0)
+            }
+        } else {
+            self.remove(&val);
+            None
+        }
+    }
+}
+
 /// ランレングス圧縮のトレイト
 pub trait RunLengthEncoding {
     /// 配列やベクターをランレングス圧縮して、各要素とその連長の組のベクターを返す関数
