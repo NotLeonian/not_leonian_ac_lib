@@ -252,10 +252,15 @@ pub trait Usize {
     fn usize(self) -> usize;
 }
 
-impl Usize for bool {
+impl<T> Usize for T where Self: num::PrimInt {
     fn usize(self) -> usize {
-        self as usize
+        self.to_usize().unwrap()
     }
+}
+
+/// bool型の値をusizeにキャストする関数
+pub fn usize(cond: bool) -> usize {
+    cond as usize
 }
 
 /// isizeにキャストするトレイト
@@ -264,10 +269,15 @@ pub trait Isize {
     fn isize(self) -> isize;
 }
 
-impl Isize for bool {
+impl<T> Isize for T where Self: num::PrimInt {
     fn isize(self) -> isize {
-        self as isize
+        self.to_isize().unwrap()
     }
+}
+
+/// bool型の値をisizeにキャストする関数
+pub fn isize(cond: bool) -> isize {
+    cond as isize
 }
 
 /// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
@@ -524,13 +534,13 @@ pub trait Graph where Self: Sized {
         }
         g
     }
-    /// 頂点aから頂点bへの辺があるかどうかを判定し、辺があれば重みを返す関数（返り値の型は`Option<usize>`）（VecGraphの場合の使用は非推奨）
+    /// 頂点aから頂点bへの辺があるかどうかを判定し、辺があれば重みを返す関数（返り値はOption）（VecGraphの場合の使用は非推奨）
     fn weight(&self, a: usize, b: usize) -> Option<usize>;
     /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）（到達不能ならばusize::MAXが入る）
     fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
     /// グラフからUnion-Find木を構築する関数（0-indexed）
     fn construct_union_find(&self) -> ac_library::Dsu;
-    /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値の型は`Option<Vec<bool>>`）
+    /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値はOption）
     fn is_bipartite_graph(&self) -> Option<Vec<bool>>;
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
     fn pruefer_code(&self) -> Vec<usize>;
@@ -812,7 +822,7 @@ pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f
 }
 
 /// 最小値を取り出すことのできる優先度つきキューの構造体
-#[derive(Clone, Default, std::fmt::Debug)]
+#[derive(Clone, Default, Debug)]
 pub struct RevBinaryHeap<T> where T: Ord {
     binary_heap: std::collections::BinaryHeap<std::cmp::Reverse<T>>
 }
@@ -1072,7 +1082,7 @@ impl<T> MapMultiSet for std::collections::BTreeMap<T, usize> where T: Copy + Ord
 }
 
 /// 追加と削除とmexの管理ができる非負整数の多重集合の構造体
-#[derive(Clone, std::fmt::Debug)]
+#[derive(Clone, Debug)]
 pub struct MexMultiSet {
     max: usize,
     multiset: MultiSet<usize>,
@@ -1525,7 +1535,7 @@ impl<T> WeightedUnionHeuristic for std::collections::BinaryHeap<T> where T: Ord 
 }
 
 /// N1×N2行列の構造体（num::powで行列累乗を計算できる）
-#[derive(Clone, std::fmt::Debug)]
+#[derive(Clone, Debug)]
 pub struct Matrix<T, const N1: usize, const N2: usize> {
     matrix: [[T;N2];N1]
 }
@@ -1714,7 +1724,7 @@ impl Doubling for Vec<Vec<usize>> {
 }
 
 /// 重みつきUnion-Findの構造体（重みの型はisize）（0-indexed）
-#[derive(Clone, std::fmt::Debug)]
+#[derive(Clone, Debug)]
 pub struct WeightedDSU {
     parents: Vec<isize>,
     potentials: Vec<isize>
@@ -1769,6 +1779,106 @@ impl WeightedDSU {
     pub fn size(&mut self, a: usize) -> usize {
         let leader=self.leader(a);
         (-self.parents[leader]) as usize
+    }
+}
+
+/// slope trickの構造体（プリミティブな整数型および浮動小数点型に対応）
+/// （ただし浮動小数点型で用いる場合は型パラメータをordered_float::OrderedFloatとすることに注意）
+#[derive(Clone, Default, Debug)]
+pub struct SlopeTrick<T> where T: Ord {
+    min: T,
+    left_vertices: std::collections::BinaryHeap<T>,
+    right_vertices: RevBinaryHeap<T>,
+    left_offset: T,
+    right_offset: T
+}
+
+impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float + std::ops::AddAssign {
+    /// 初期化の関数
+    pub fn new() -> Self {
+        SlopeTrick::default()
+    }
+    /// 関数の最小値を返す関数
+    pub fn min(&self) -> T {
+        self.min.0
+    }
+    /// 最小値をとる点の最小値を返す関数（存在しなければNoneを返す）
+    pub fn left_min_point(&self) -> Option<T> {
+        if let Some(&p)=self.left_vertices.peek() {
+            Some((p+self.left_offset).0)
+        } else {
+            None
+        }
+    }
+    /// 最小値をとる点の最大値を返す関数（存在しなければNoneを返す）
+    pub fn right_min_point(&self) -> Option<T> {
+        if let Some(&p)=self.right_vertices.peek() {
+            Some((p+self.right_offset).0)
+        } else {
+            None
+        }
+    }
+    /// 関数に定数関数を足す関数
+    pub fn add_const(&mut self, c: T) {
+        self.min+=c;
+    }
+    /// 関数にmax(p-x,0)を足す関数
+    pub fn add_left_slope(&mut self, p: T) {
+        let p=ordered_float::OrderedFloat(p);
+        if let Some(mp)=self.right_min_point() {
+            let mp=ordered_float::OrderedFloat(mp);
+            if p>mp {
+                self.min+=p-mp;
+                self.right_vertices.push(p-self.right_offset);
+                self.right_vertices.pop();
+                self.left_vertices.push(mp-self.left_offset);
+            } else {
+                self.left_vertices.push(p-self.left_offset);
+            }
+        } else {
+            self.left_vertices.push(p-self.left_offset);
+        }
+    }
+    /// 関数にmax(x-p,0)を足す関数
+    pub fn add_right_slope(&mut self, p: T) {
+        let p=ordered_float::OrderedFloat(p);
+        if let Some(mp)=self.left_min_point() {
+            let mp=ordered_float::OrderedFloat(mp);
+            if p<mp {
+                self.min+=mp-p;
+                self.left_vertices.push(p-self.left_offset);
+                self.left_vertices.pop();
+                self.right_vertices.push(mp-self.right_offset);
+            } else {
+                self.right_vertices.push(p-self.right_offset);
+            }
+        } else {
+            self.right_vertices.push(p-self.right_offset);
+        }
+    }
+    /// 関数に|x-p|を足す関数
+    pub fn add_abs_slope(&mut self, p: T) {
+        self.add_left_slope(p);
+        self.add_right_slope(p);
+    }
+    /// 関数の左側累積minをとる関数（破壊的であることに注意）
+    pub fn prefix_min(&mut self) {
+        self.right_vertices.clear();
+    }
+    /// 関数の右側累積minをとる関数（破壊的であることに注意）
+    pub fn suffix_min(&mut self) {
+        self.left_vertices.clear();
+    }
+    /// 関数f(x)をf(x-a)に変化させる関数
+    pub fn shift(&mut self, a: T) {
+        self.left_offset+=a;
+        self.right_offset+=a;
+    }
+    /// 関数f(x)を区間[x-b,x-a]におけるfの最小値に変化させる関数
+    pub fn sliding_window_minimum(&mut self, a: T, b: T) {
+        debug_assert!(a<=b);
+        self.left_offset+=a;
+        self.right_offset+=b;
     }
 }
 
@@ -2172,6 +2282,12 @@ pub trait BitDigits {
     fn bit_digits(self) -> usize;
 }
 
+impl<T> BitDigits for T where Self: num::PrimInt {
+    fn bit_digits(self) -> usize {
+        (Self::zero().leading_zeros()-self.leading_zeros()-1) as usize
+    }
+}
+
 /// 10のi乗のstatic定数
 pub static E: [usize;19]=gen_e();
 
@@ -2231,22 +2347,10 @@ impl<T> RationalReconstruct for Vec<T> where T: RationalReconstruct {
     }
 }
 
-/// プリミティブな整数型についてimplを定義するマクロ
+/// プリミティブな整数型についてimplを定義するマクロ（別のジェネリクスと併用したい場合などに使用）
 macro_rules! impl_integer {
     ($($ty:ty),*) => {
         $(
-            impl Usize for $ty {
-                fn usize(self) -> usize {
-                    self as usize
-                }
-            }
-
-            impl Isize for $ty {
-                fn isize(self) -> isize {
-                    self as isize
-                }
-            }
-
             impl Zero for $ty {
                 fn zero_val() -> Self {
                     0
@@ -2259,9 +2363,76 @@ macro_rules! impl_integer {
                 }
             }
 
-            impl BitDigits for $ty {
-                fn bit_digits(self) -> usize {
-                    self.ilog2() as usize
+            impl SlopeTrick<$ty> {
+                pub fn new() -> Self {
+                    SlopeTrick::default()
+                }
+                pub fn min(&self) -> $ty {
+                    self.min
+                }
+                pub fn left_min_point(&self) -> Option<$ty> {
+                    if let Some(&p)=self.left_vertices.peek() {
+                        Some(p+self.left_offset)
+                    } else {
+                        None
+                    }
+                }
+                pub fn right_min_point(&self) -> Option<$ty> {
+                    if let Some(&p)=self.right_vertices.peek() {
+                        Some(p+self.right_offset)
+                    } else {
+                        None
+                    }
+                }
+                pub fn add_const(&mut self, c: $ty) {
+                    self.min+=c;
+                }
+                pub fn add_left_slope(&mut self, p: $ty) {
+                    if let Some(mp)=self.right_min_point() {
+                        if p>mp {
+                            self.min+=p-mp;
+                            self.right_vertices.push(p-self.right_offset);
+                            self.right_vertices.pop();
+                            self.left_vertices.push(mp-self.left_offset);
+                        } else {
+                            self.left_vertices.push(p-self.left_offset);
+                        }
+                    } else {
+                        self.left_vertices.push(p-self.left_offset);
+                    }
+                }
+                pub fn add_right_slope(&mut self, p: $ty) {
+                    if let Some(mp)=self.left_min_point() {
+                        if p<mp {
+                            self.min+=mp-p;
+                            self.left_vertices.push(p-self.left_offset);
+                            self.left_vertices.pop();
+                            self.right_vertices.push(mp-self.right_offset);
+                        } else {
+                            self.right_vertices.push(p-self.right_offset);
+                        }
+                    } else {
+                        self.right_vertices.push(p-self.right_offset);
+                    }
+                }
+                pub fn add_abs_slope(&mut self, p: $ty) {
+                    self.add_left_slope(p);
+                    self.add_right_slope(p);
+                }
+                pub fn prefix_min(&mut self) {
+                    self.right_vertices.clear();
+                }
+                pub fn suffix_min(&mut self) {
+                    self.left_vertices.clear();
+                }
+                pub fn shift(&mut self, a: $ty) {
+                    self.left_offset+=a;
+                    self.right_offset+=a;
+                }
+                pub fn sliding_window_minimum(&mut self, a: $ty, b: $ty) {
+                    debug_assert!(a<=b);
+                    self.left_offset+=a;
+                    self.right_offset+=b;
                 }
             }
         )*
@@ -2269,22 +2440,5 @@ macro_rules! impl_integer {
 }
 
 impl_integer!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
-
-/// 結合テスト用（AtCoderの環境に含まれないクレートを使用していることに注意）
-#[macro_export]
-macro_rules! tests {
-    ($name:expr,$($num:expr,$input:expr,$output:expr),*) => {
-        $(
-            paste::paste! {
-                #[test]
-                fn [<$name _sample_ $num>]() {
-                    let mut cmd=assert_cmd::Command::cargo_bin($name).unwrap();
-                    cmd.write_stdin($input);
-                    cmd.assert().success().stdout(predicates::prelude::predicate::str::diff($output));
-                }
-            }
-        )*
-    };
-}
 
 // not_leonian_ac_lib until this line
