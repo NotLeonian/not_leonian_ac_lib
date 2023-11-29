@@ -468,90 +468,6 @@ impl<T> ChminChmax for T where T: Clone + PartialOrd {
     }
 }
 
-/// 配列やベクターの最小値の添字を返すトレイト
-pub trait MinIndex {
-    /// 配列やベクターの最小値の添字を返す関数（最小値が複数存在する場合は最小の添字）
-    fn min_index(&self) -> usize;
-}
-
-impl<T> MinIndex for Vec<T> where T: PartialOrd {
-    fn min_index(&self) -> usize {
-        let mut index=0;
-        for i in 1..self.len() {
-            if self[i]<self[index] {
-                index=i;
-            }
-        }
-        index
-    }
-}
-
-impl<T> MinIndex for [T] where T: PartialOrd {
-    fn min_index(&self) -> usize {
-        let mut index=0;
-        for i in 1..self.len() {
-            if self[i]<self[index] {
-                index=i;
-            }
-        }
-        index
-    }
-}
-
-impl<T, const N: usize> MinIndex for [T;N] where T: PartialOrd {
-    fn min_index(&self) -> usize {
-        let mut index=0;
-        for i in 1..self.len() {
-            if self[i]<self[index] {
-                index=i;
-            }
-        }
-        index
-    }
-}
-
-/// 配列やベクターの最大値の添字を返すトレイト
-pub trait MaxIndex {
-    /// 配列やベクターの最大値の添字を返す関数（最大値が複数存在する場合は最小の添字）
-    fn max_index(&self) -> usize;
-}
-
-impl<T> MaxIndex for Vec<T> where T: PartialOrd {
-    fn max_index(&self) -> usize {
-        let mut index=0;
-        for i in 1..self.len() {
-            if self[i]>self[index] {
-                index=i;
-            }
-        }
-        index
-    }
-}
-
-impl<T> MaxIndex for [T] where T: PartialOrd {
-    fn max_index(&self) -> usize {
-        let mut index=0;
-        for i in 1..self.len() {
-            if self[i]>self[index] {
-                index=i;
-            }
-        }
-        index
-    }
-}
-
-impl<T, const N: usize> MaxIndex for [T;N] where T: PartialOrd {
-    fn max_index(&self) -> usize {
-        let mut index=0;
-        for i in 1..self.len() {
-            if self[i]>self[index] {
-                index=i;
-            }
-        }
-        index
-    }
-}
-
 /// ソートされているベクターどうしを、ソートされた1つのベクターへマージする関数
 pub fn merge_vecs<T>(a: &Vec<T>, b: &Vec<T>) -> Vec<T> where T: Clone + PartialOrd {
     itertools::Itertools::merge(a.iter(), b.iter()).cloned().collect()
@@ -1155,6 +1071,53 @@ impl<T> MapMultiSet for std::collections::BTreeMap<T, usize> where T: Copy + Ord
     }
 }
 
+/// 追加と削除とmexの管理ができる非負整数の多重集合の構造体
+#[derive(Clone, std::fmt::Debug)]
+pub struct MexMultiSet {
+    max: usize,
+    multiset: MultiSet<usize>,
+    complement: std::collections::BTreeSet<usize>
+}
+
+impl MexMultiSet {
+    /// 初期化の関数（nは多重集合の重ならない最大の要素数）
+    pub fn new(n: usize) -> Self {
+        use std::iter::FromIterator;
+        MexMultiSet {
+            max: n,
+            multiset: MultiSet::<usize>::new(),
+            complement: std::collections::BTreeSet::<usize>::from_iter(0..=n)
+        }
+    }
+    /// 多重集合に1つvalを追加する関数
+    pub fn insert_one(&mut self, val: usize) {
+        if val<=self.max {
+            self.multiset.insert_one(val);
+            self.complement.remove(&val);
+        }
+    }
+    /// 多重集合から1つvalを削除する関数（返り値は削除する要素があったかどうか）
+    pub fn remove_one(&mut self, val: usize) -> bool {
+        if val<=self.max {
+            let ret=self.multiset.remove_one(val);
+            if let Some(cnt)=ret {
+                if cnt==0 {
+                    self.complement.insert(val);
+                }
+                true
+            } else {
+                false
+            }
+        } else {
+            true
+        }
+    }
+    /// 多重集合のmexを返す関数
+    pub fn mex(&self) -> usize {
+        *self.complement.first().unwrap()
+    }
+}
+
 /// ランレングス圧縮のトレイト
 pub trait RunLengthEncoding {
     /// 配列やベクターをランレングス圧縮して、各要素とその連長の組のベクターを返す関数
@@ -1751,6 +1714,7 @@ impl Doubling for Vec<Vec<usize>> {
 }
 
 /// 重みつきUnion-Findの構造体（重みの型はisize）（0-indexed）
+#[derive(Clone, std::fmt::Debug)]
 pub struct WeightedDSU {
     parents: Vec<isize>,
     potentials: Vec<isize>
