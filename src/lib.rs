@@ -1092,11 +1092,10 @@ pub struct MexMultiSet {
 impl MexMultiSet {
     /// 初期化の関数（nは多重集合の重ならない最大の要素数）
     pub fn new(n: usize) -> Self {
-        use std::iter::FromIterator;
         MexMultiSet {
             max: n,
             multiset: MultiSet::<usize>::new(),
-            complement: std::collections::BTreeSet::<usize>::from_iter(0..=n)
+            complement: std::iter::FromIterator::from_iter(0..=n)
         }
     }
     /// 多重集合に1つvalを追加する関数
@@ -1200,13 +1199,29 @@ pub trait Primes where Self: Sized {
     /// 素因数分解をする関数
     fn prime_factorize(self) -> Vec<(Self,Self)>;
     /// ルジャンドルの定理でselfの階乗がpで何回割り切れるかを計算する関数
-    fn legendre_s_formula(self, p: usize) -> usize;
+    fn legendre_s_formula(self, p: Self) -> Self;
     /// エラトステネスの篩で素数を列挙する関数
     fn sieve_of_eratosthenes(nmax: Self) -> Vec<bool>;
     /// 線形篩で最小素因数を列挙する関数
     fn linear_sieve(nmax: Self) -> (Vec<Self>,Vec<Self>);
     /// 線形篩を用いて素因数分解をする関数
     fn fast_prime_factorize(self, linear_sieve: &Vec<Self>) -> Vec<(Self,Self)>;
+    /// 32bitで表せる非負整数についてミラー・ラビン素数判定法で素数か判定する関数
+    fn is_prime_using_32bit_miller_rabin(self) -> bool;
+    /// 64bitで表せる非負整数についてミラー・ラビン素数判定法で素数か判定する関数
+    fn is_prime_using_64bit_miller_rabin(self) -> bool;
+    /// ミラー・ラビン素数判定法で素数か判定する関数
+    fn is_prime_using_miller_rabin(self) -> bool;
+    /// 32bitで表せる非負整数についてポラード・ロー法で素因数分解をする関数
+    fn prime_factorize_using_32bit_pollard_s_rho(self) -> Vec<(Self,Self)>;
+    /// 64bitで表せる非負整数についてポラード・ロー法で素因数分解をする関数
+    fn prime_factorize_using_64bit_pollard_s_rho(self) -> Vec<(Self,Self)>;
+    /// ポラード・ロー法で素因数分解をする関数
+    fn prime_factorize_using_pollard_s_rho(self) -> Vec<(Self,Self)>;
+    /// ポラード・ロー法で素数冪か判定する関数
+    fn is_prime_power_using_pollard_s_rho(self) -> bool;
+    /// ポラード・ロー法で約数を列挙する関数
+    fn enumerate_divisors_using_pollard_s_rho(self) -> Vec<Self>;
 }
 
 impl Primes for usize {
@@ -1262,7 +1277,7 @@ impl Primes for usize {
         }
         pes
     }
-    fn legendre_s_formula(mut self, p: usize) -> usize {
+    fn legendre_s_formula(mut self, p: Self) -> Self {
         let mut e=0;
         while self>0 {
             e+=self/p;
@@ -1317,6 +1332,285 @@ impl Primes for usize {
         }
         pes.push((p,e));
         pes
+    }
+    fn is_prime_using_32bit_miller_rabin(self) -> bool {
+        debug_assert!(self<(1<<32));
+        if self==2 || self==7 || self==61 {
+            return true;
+        }
+        if self%2==0 || self==1 {
+            return false;
+        }
+        let checkers=[2,7,61];
+        let n=self;
+        let m=n-1;
+        let s=m.trailing_zeros();
+        let d=m>>s;
+        for a in checkers {
+            let mut x=1;
+            let mut p=a%n;
+            let mut e=d;
+            while e>0 {
+                if e%2>0 {
+                    x*=p;
+                    x%=n;
+                }
+                p*=p;
+                p%=n;
+                e/=2;
+            }
+            if x==1 {
+                continue;
+            }
+            let mut comp=true;
+            for _ in 0..s {
+                if x==m {
+                    comp=false;
+                    break;
+                }
+                x*=x;
+                x%=n;
+            }
+            if comp {
+                return false;
+            }
+        }
+        true
+    }
+    fn is_prime_using_64bit_miller_rabin(self) -> bool {
+        if self==2 {
+            return true;
+        }
+        if self%2==0 || self==1 {
+            return false;
+        }
+        let checkers=[2,325,9375,28178,450775,9780504,1795265022];
+        let n=self as u128;
+        let m=self-1;
+        let s=m.trailing_zeros();
+        let d=m>>s;
+        for a in checkers {
+            let mut x=1;
+            let mut p=a as u128%n;
+            let mut e=d;
+            while e>0 {
+                if e%2>0 {
+                    x*=p;
+                    x%=n;
+                }
+                p*=p;
+                p%=n;
+                e/=2;
+            }
+            if x==1 {
+                continue;
+            }
+            let mut comp=true;
+            for _ in 0..s {
+                if x==n-1 {
+                    comp=false;
+                    break;
+                }
+                x*=x;
+                x%=n;
+            }
+            if comp {
+                return false;
+            }
+        }
+        true
+    }
+    fn is_prime_using_miller_rabin(self) -> bool {
+        if self<(1<<32) {
+            self.is_prime_using_32bit_miller_rabin()
+        } else {
+            self.is_prime_using_64bit_miller_rabin()
+        }
+    }
+    fn prime_factorize_using_32bit_pollard_s_rho(self) -> Vec<(Self,Self)> {
+        debug_assert!(self<(1<<32));
+        if self==1 {
+            return Vec::new();
+        }
+        let cnt=self.trailing_zeros() as usize;
+        if cnt>0 {
+            let mut ret=vec![(2,cnt)];
+            ret.extend((self>>cnt).prime_factorize_using_32bit_pollard_s_rho());
+            return ret;
+        }
+        if self.is_prime_using_32bit_miller_rabin() {
+            return vec![(self,1)];
+        }
+        let m=num_integer::Roots::nth_root(&self, 8)+1;
+        let mut d=0;
+        for c in 1..self {
+            let f=|y:usize| ((y*y)%self+c)%self;
+            let mut y=0;
+            let mut r=1;
+            let mut q=1;
+            let mut g=1;
+            let mut x=y;
+            let mut s=y;
+            while g==1 {
+                x=y;
+                for _ in 0..r {
+                    y=f(y);
+                }
+                let mut k=0;
+                while k<r && g==1 {
+                    s=y;
+                    for _ in 0..min(m,r-k) {
+                        y=f(y);
+                        q*=x.abs_diff(y);
+                        q%=self;
+                    }
+                    g=num_integer::gcd(q, self);
+                    k+=m;
+                }
+                r*=2;
+            }
+            if g==self {
+                g=1;
+                y=s;
+                while g==1 {
+                    y=f(y);
+                    g=num_integer::gcd(x.abs_diff(y), self);
+                }
+            }
+            if g<self {
+                d=g;
+                break;
+            }
+        }
+        if d==0 {
+            panic!("{}",self);
+        }
+        let mut ret1=d.prime_factorize_using_32bit_pollard_s_rho();
+        let mut q=self/d;
+        for pe in &mut ret1 {
+            while q%pe.0==0 {
+                q/=pe.0;
+                pe.1+=1;
+            }
+        }
+        merge_vecs(&ret1, &q.prime_factorize_using_32bit_pollard_s_rho())
+    }
+    fn prime_factorize_using_64bit_pollard_s_rho(self) -> Vec<(Self,Self)> {
+        let is_32bit=self<(1<<32);
+        if self==1 {
+            return Vec::new();
+        }
+        let cnt=self.trailing_zeros() as usize;
+        if cnt>0 {
+            let mut ret=vec![(2,cnt)];
+            ret.extend(if is_32bit {
+                (self>>cnt).prime_factorize_using_32bit_pollard_s_rho()
+            } else {
+                (self>>cnt).prime_factorize_using_64bit_pollard_s_rho()
+            });
+            return ret;
+        }
+        if is_32bit {
+            if self.is_prime_using_32bit_miller_rabin() {
+                return vec![(self,1)];
+            }
+        } else {
+            if self.is_prime_using_64bit_miller_rabin() {
+                return vec![(self,1)];
+            }
+        }
+        let m=num_integer::Roots::nth_root(&self, 8)+1;
+        let mut d=0;
+        let n=self as u128;
+        for c in 1..n {
+            let f=|y:u128| ((y*y)%n+c)%n;
+            let mut y=0;
+            let mut r=1;
+            let mut q=1;
+            let mut g=1;
+            let mut x=y;
+            let mut s=y;
+            while g==1 {
+                x=y;
+                for _ in 0..r {
+                    y=f(y);
+                }
+                let mut k=0;
+                while k<r && g==1 {
+                    s=y;
+                    for _ in 0..min(m,r-k) {
+                        y=f(y);
+                        q*=x.abs_diff(y);
+                        q%=n;
+                    }
+                    g=num_integer::gcd(q, n);
+                    k+=m;
+                }
+                r*=2;
+            }
+            if g==n {
+                g=1;
+                y=s;
+                while g==1 {
+                    y=f(y);
+                    g=num_integer::gcd(x.abs_diff(y), n);
+                }
+            }
+            if g<n {
+                d=g as usize;
+                break;
+            }
+        }
+        if d==0 {
+            panic!("{}",self);
+        }
+        let mut ret1=if is_32bit {
+            d.prime_factorize_using_32bit_pollard_s_rho()
+        } else {
+            d.prime_factorize_using_64bit_pollard_s_rho()
+        };
+        let mut q=self/d;
+        for pe in &mut ret1 {
+            while q%pe.0==0 {
+                q/=pe.0;
+                pe.1+=1;
+            }
+        }
+        merge_vecs(&ret1, &if is_32bit {
+            q.prime_factorize_using_32bit_pollard_s_rho()
+        } else {
+            q.prime_factorize_using_64bit_pollard_s_rho()
+        })
+    }
+    fn prime_factorize_using_pollard_s_rho(self) -> Vec<(Self,Self)> {
+        if self<(1<<32) {
+            self.prime_factorize_using_32bit_pollard_s_rho()
+        } else {
+            self.prime_factorize_using_64bit_pollard_s_rho()
+        }
+    }
+    fn is_prime_power_using_pollard_s_rho(self) -> bool {
+        if self<(1<<32) {
+            self.prime_factorize_using_32bit_pollard_s_rho().len()==1
+        } else {
+            self.prime_factorize_using_64bit_pollard_s_rho().len()==1
+        }
+    }
+    fn enumerate_divisors_using_pollard_s_rho(self) -> Vec<Self> {
+        let pe=self.prime_factorize_using_pollard_s_rho();
+        let mut ret=vec![1];
+        for (p,e) in pe {
+            let len=ret.len();
+            for i in 0..len {
+                let mut q=p;
+                for _ in 0..e {
+                    ret.push(ret[i]*q);
+                    q*=p;
+                }
+            }
+        }
+        ret.sort();
+        ret
     }
 }
 
