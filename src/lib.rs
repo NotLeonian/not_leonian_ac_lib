@@ -1496,28 +1496,17 @@ impl Primes for usize {
         merge_vecs(&ret1, &q.prime_factorize_using_32bit_pollard_s_rho())
     }
     fn prime_factorize_using_64bit_pollard_s_rho(self) -> Vec<(Self,Self)> {
-        let is_32bit=self<(1<<32);
         if self==1 {
             return Vec::new();
         }
         let cnt=self.trailing_zeros() as usize;
         if cnt>0 {
             let mut ret=vec![(2,cnt)];
-            ret.extend(if is_32bit {
-                (self>>cnt).prime_factorize_using_32bit_pollard_s_rho()
-            } else {
-                (self>>cnt).prime_factorize_using_64bit_pollard_s_rho()
-            });
+            ret.extend((self>>cnt).prime_factorize_using_pollard_s_rho());
             return ret;
         }
-        if is_32bit {
-            if self.is_prime_using_32bit_miller_rabin() {
-                return vec![(self,1)];
-            }
-        } else {
-            if self.is_prime_using_64bit_miller_rabin() {
-                return vec![(self,1)];
-            }
+        if self.is_prime_using_miller_rabin() {
+            return vec![(self,1)];
         }
         let m=num_integer::Roots::nth_root(&self, 8)+1;
         let mut d=0;
@@ -1564,11 +1553,7 @@ impl Primes for usize {
         if d==0 {
             panic!("{}",self);
         }
-        let mut ret1=if is_32bit {
-            d.prime_factorize_using_32bit_pollard_s_rho()
-        } else {
-            d.prime_factorize_using_64bit_pollard_s_rho()
-        };
+        let mut ret1=d.prime_factorize_using_pollard_s_rho();
         let mut q=self/d;
         for pe in &mut ret1 {
             while q%pe.0==0 {
@@ -1576,11 +1561,7 @@ impl Primes for usize {
                 pe.1+=1;
             }
         }
-        merge_vecs(&ret1, &if is_32bit {
-            q.prime_factorize_using_32bit_pollard_s_rho()
-        } else {
-            q.prime_factorize_using_64bit_pollard_s_rho()
-        })
+        merge_vecs(&ret1, &q.prime_factorize_using_pollard_s_rho())
     }
     fn prime_factorize_using_pollard_s_rho(self) -> Vec<(Self,Self)> {
         if self<(1<<32) {
