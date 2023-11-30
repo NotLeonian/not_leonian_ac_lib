@@ -2093,6 +2093,155 @@ impl<T> WeightedUnionHeuristic for std::collections::BinaryHeap<T> where T: Ord 
     }
 }
 
+/// 半分全列挙を行うトレイト（それぞれの関数の引数はeが和の単位元、sumが和の関数、valが比較する値）
+pub trait MeetInTheMiddle where Self: Sized + std::ops::Index<usize>, Self::Output: Sized {
+    /// 半分全列挙によりvalと一致する部分和が存在するか判定する関数
+    fn meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> bool where F1: Fn(Self::Output,Self::Output) -> Self::Output;
+    /// 半分全列挙によりval以下の部分和が存在するか判定し、存在するならばその最大値を返す関数（返り値の型はOption）
+    fn min_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
+    /// 半分全列挙によりval以上の部分和が存在するか判定し、存在するならばその最小値を返す関数（返り値の型はOption）
+    fn max_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
+    /// 半分全列挙によりvalと一致する部分和が存在するか判定し、存在するならばその例に各要素が含まれるかを返す関数（返り値の型はOption）
+    fn example_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Vec<bool>> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
+}
+
+impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd + std::fmt::Debug {
+    fn meet_in_the_middle<F1>(&self, e: T, sum: F1, val: T) -> bool where F1: Fn(T,T) -> T {
+        let len=self.len();
+        let mid=self.len()/2;
+        let mut left_set=vec![e];
+        for i in 0..mid {
+            let left_1=std::mem::take(&mut left_set);
+            let left_2=vec_range(0, 1<<i, |j| sum(left_1[j],self[i]));
+            left_set=merge_vecs(&left_1, &left_2);
+        }
+        let mut right_set=vec![e];
+        for i in 0..len-mid {
+            let right_1=std::mem::take(&mut right_set);
+            let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
+            right_set=merge_vecs(&right_1, &right_2);
+        }
+        let mut r=-1;
+        for &l in left_set.iter().rev() {
+            r+=1;
+            while r<right_set.len() as isize && sum(l,right_set[r as usize])<=val {
+                r+=1;
+            }
+            r-=1;
+            if r>=0 && sum(l,right_set[r as usize])==val {
+                return true;
+            }
+        }
+        false
+    }
+    fn min_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output {
+        let len=self.len();
+        let mid=self.len()/2;
+        let mut left_set=vec![e];
+        for i in 0..mid {
+            let left_1=std::mem::take(&mut left_set);
+            let left_2=vec_range(0, 1<<i, |j| sum(left_1[j],self[i]));
+            left_set=merge_vecs(&left_1, &left_2);
+        }
+        let mut right_set=vec![e];
+        for i in 0..len-mid {
+            let right_1=std::mem::take(&mut right_set);
+            let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
+            right_set=merge_vecs(&right_1, &right_2);
+        }
+        let mut ans=None;
+        let mut r=right_set.len() as isize;
+        for l in left_set {
+            r-=1;
+            while r>=0 && sum(l,right_set[r as usize])>=val {
+                r-=1;
+            }
+            r+=1;
+            if (r as usize)<right_set.len() {
+                let s=sum(l,right_set[r as usize]);
+                if ans.is_some() {
+                    if s<ans.unwrap() {
+                        ans=Some(s);
+                    }
+                } else {
+                    ans=Some(s);
+                }
+            }
+        }
+        ans
+    }
+    fn max_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output {
+        let len=self.len();
+        let mid=self.len()/2;
+        let mut left_set=vec![e];
+        for i in 0..mid {
+            let left_1=std::mem::take(&mut left_set);
+            let left_2=vec_range(0, 1<<i, |j| sum(left_1[j],self[i]));
+            left_set=merge_vecs(&left_1, &left_2);
+        }
+        let mut right_set=vec![e];
+        for i in 0..len-mid {
+            let right_1=std::mem::take(&mut right_set);
+            let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
+            right_set=merge_vecs(&right_1, &right_2);
+        }
+        let mut ans=None;
+        let mut r=-1;
+        for &l in left_set.iter().rev() {
+            r+=1;
+            while r<right_set.len() as isize && sum(l,right_set[r as usize])<=val {
+                r+=1;
+            }
+            r-=1;
+            if r>=0 {
+                let s=sum(l,right_set[r as usize]);
+                if ans.is_some() {
+                    if s>ans.unwrap() {
+                        ans=Some(s);
+                    }
+                } else {
+                    ans=Some(s);
+                }
+            }
+        }
+        ans
+    }
+    fn example_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Vec<bool>> where F1: Fn(Self::Output,Self::Output) -> Self::Output {
+        let len=self.len();
+        let mid=self.len()/2;
+        let mut left_set=vec![(e,0usize)];
+        for i in 0..mid {
+            let left_1=std::mem::take(&mut left_set);
+            let left_2=vec_range(0, 1<<i, |j| (sum(left_1[j].0,self[i]),left_1[j].1+(1<<i)));
+            left_set=merge_vecs(&left_1, &left_2);
+        }
+        let mut right_set=vec![(e,0usize)];
+        for i in 0..len-mid {
+            let right_1=std::mem::take(&mut right_set);
+            let right_2=vec_range(0, 1<<i, |j| (sum(right_1[j].0,self[mid+i]),right_1[j].1+(1<<(mid+i))));
+            right_set=merge_vecs(&right_1, &right_2);
+        }
+        let mut r=-1;
+        for &(l,lset) in left_set.iter().rev() {
+            r+=1;
+            while r<right_set.len() as isize && sum(l,right_set[r as usize].0)<=val {
+                r+=1;
+            }
+            r-=1;
+            if r>=0 && sum(l,right_set[r as usize].0)==val {
+                let mut sets=lset+right_set[r as usize].1;
+                let mut ret=vec![false;len];
+                for i in 0..len {
+                    ret[i]=sets%2>0;
+                    sets/=2;
+                }
+                return Some(ret);
+            }
+        }
+        None
+    }
+}
+
 /// N1×N2行列の構造体（num::powで行列累乗を計算できる）
 #[derive(Clone, Debug)]
 pub struct Matrix<T, const N1: usize, const N2: usize> {
