@@ -782,16 +782,16 @@ pub fn construct_weighted_directed_graph<G>(n: usize, m: usize, abw: &Vec<(usize
 }
 
 /// 二分探索の関数（整数）
-pub fn binary_search<F>(ok: isize, bad: isize, determine: F) -> isize where F: Fn(isize) -> bool {
+pub fn binary_search<T,F>(ok: T, bad: T, determine: F) -> T where T: num::PrimInt, F: Fn(T) -> bool {
     let right=ok>bad;
     let mut ok=ok;
     let mut bad=bad;
     while if right {
-        ok-bad>1
+        ok-bad>T::one()
     } else {
-        bad-ok>1
+        bad-ok>T::one()
     } {
-        let mid=(ok+bad)/2;
+        let mid=(ok+bad)/(T::one()+T::one());
         if determine(mid) {
             ok=mid;
         } else {
@@ -858,6 +858,124 @@ impl<T> RevBinaryHeap<T> where T: Ord {
     }
     pub fn clear(&mut self) {
         self.binary_heap.clear();
+    }
+}
+
+/// 最大値を高速に取り出せるとともに、最大値以外の値も削除できる優先度つきキューの構造体
+#[derive(Clone, Default, Debug)]
+pub struct RemovableBinaryHeap<T> where T: Ord {
+    binary_heap: std::collections::BinaryHeap<T>,
+    removed: std::collections::BinaryHeap<T>
+}
+
+impl<T> RemovableBinaryHeap<T> where T: Ord {
+    pub fn new() -> Self {
+        Self {
+            binary_heap: std::collections::BinaryHeap::<T>::new(),
+            removed: std::collections::BinaryHeap::<T>::new()
+        }
+    }
+    /// removedに含まれる要素のうち、現在削除できるものを削除する関数
+    pub fn flush(&mut self) {
+        while let Some(rem)=self.removed.peek() {
+            if let Some(top)=self.binary_heap.peek() {
+                if top==rem {
+                    self.binary_heap.pop();
+                    self.removed.pop();
+                } else {
+                    break;
+                }
+            } else {
+                self.removed.clear();
+            }
+        }
+    }
+    pub fn is_empty(&mut self) -> bool {
+        self.flush();
+        self.binary_heap.is_empty()
+    }
+    /// pushしていない要素をremoveすると正しくない値となる可能性があるので注意
+    pub fn len(&mut self) -> usize {
+        self.binary_heap.len()-self.removed.len()
+    }
+    pub fn push(&mut self, item: T) {
+        self.binary_heap.push(item);
+    }
+    pub fn pop(&mut self) -> Option<T> {
+        self.flush();
+        self.binary_heap.pop()
+    }
+    pub fn peek(&mut self) -> Option<&T> {
+        self.flush();
+        self.binary_heap.peek()
+    }
+    /// itemを削除する関数
+    pub fn remove(&mut self, item: T) {
+        self.removed.push(item);
+        self.flush();
+    }
+    pub fn clear(&mut self) {
+        self.binary_heap.clear();
+        self.removed.clear();
+    }
+}
+
+/// 最小値を高速に取り出せるとともに、最小値以外の値も削除できる優先度つきキューの構造体
+#[derive(Clone, Default, Debug)]
+pub struct RemovableRevBinaryHeap<T> where T: Ord {
+    binary_heap: RevBinaryHeap<T>,
+    removed: RevBinaryHeap<T>
+}
+
+impl<T> RemovableRevBinaryHeap<T> where T: Ord {
+    pub fn new() -> Self {
+        Self {
+            binary_heap: RevBinaryHeap::<T>::new(),
+            removed: RevBinaryHeap::<T>::new()
+        }
+    }
+    /// removedに含まれる要素のうち、現在削除できるものを削除する関数
+    pub fn flush(&mut self) {
+        while let Some(rem)=self.removed.peek() {
+            if let Some(top)=self.binary_heap.peek() {
+                if top==rem {
+                    self.binary_heap.pop();
+                    self.removed.pop();
+                } else {
+                    break;
+                }
+            } else {
+                self.removed.clear();
+            }
+        }
+    }
+    pub fn is_empty(&mut self) -> bool {
+        self.flush();
+        self.binary_heap.is_empty()
+    }
+    /// pushしていない要素をremoveすると正しくない値となる可能性があるので注意
+    pub fn len(&mut self) -> usize {
+        self.binary_heap.len()-self.removed.len()
+    }
+    pub fn push(&mut self, item: T) {
+        self.binary_heap.push(item);
+    }
+    pub fn pop(&mut self) -> Option<T> {
+        self.flush();
+        self.binary_heap.pop()
+    }
+    pub fn peek(&mut self) -> Option<&T> {
+        self.flush();
+        self.binary_heap.peek()
+    }
+    /// itemを削除する関数
+    pub fn remove(&mut self, item: T) {
+        self.removed.push(item);
+        self.flush();
+    }
+    pub fn clear(&mut self) {
+        self.binary_heap.clear();
+        self.removed.clear();
     }
 }
 
@@ -1125,6 +1243,172 @@ impl MexMultiSet {
     pub fn mex(&self) -> usize {
         *self.complement.first().unwrap()
     }
+}
+
+/// BTreeSetを用いて区間を管理する集合についての型
+pub type RangeSet<T>=std::collections::BTreeSet<(T,T)>;
+
+/// 区間を管理する集合のトレイト（現状は区間追加と区間削除には非対応）
+pub trait SetOfRanges<T> {
+    /// 初期化する関数
+    fn new() -> Self;
+    /// valが集合に属するかどうかを判定し、属するならば属する区間を返す関数（返り値はOption）
+    fn includes(&self, val: T) -> Option<(T,T)>;
+    /// valを集合に追加する関数（返り値は追加できたかどうか）
+    fn insert_one(&mut self, val: T) -> bool;
+    /// valを集合から削除する関数（返り値は削除できたかどうか）
+    fn remove_one(&mut self, val: T) -> bool;
+    /// 集合のmexを返す関数（isizeの場合も非負整数に限って考える）
+    fn mex(&self) -> T;
+}
+
+impl SetOfRanges<usize> for std::collections::BTreeSet<(usize,usize)> {
+    fn new() -> Self {
+        std::collections::BTreeSet::default()
+    }
+    fn includes(&self, val: usize) -> Option<(usize,usize)> {
+        if let Some(&range)=self.range(..(val+1,val+1)).last() {
+            if val<=range.1 {
+                Some(range)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    fn insert_one(&mut self, val: usize) -> bool {
+        if self.includes(val).is_none() {
+            if val==0 {
+                if let Some((_,r))=self.includes(1) {
+                    self.remove(&(1,r));
+                    self.insert((0,r));
+                } else {
+                    self.insert((0,0));
+                }
+            } else if let Some((l,_))=self.includes(val-1) {
+                if let Some((_,r))=self.includes(val+1) {
+                    self.remove(&(l,val-1));
+                    self.remove(&(val+1,r));
+                    self.insert((l,r));
+                } else {
+                    self.remove(&(l,val-1));
+                    self.insert((l,val));
+                }
+            } else {
+                if let Some((_,r))=self.includes(val+1) {
+                    self.remove(&(val+1,r));
+                    self.insert((val,r));
+                } else {
+                    self.insert((val,val));
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+    fn remove_one(&mut self, val: usize) -> bool {
+        if let Some((l,r))=self.includes(val) {
+            self.remove(&(l,r));
+            if l!=val {
+                if r!=val {
+                    self.insert((l,val-1));
+                    self.insert((val+1,r));
+                } else {
+                    self.insert((l,val-1));
+                }
+            } else if r!=val {
+                self.insert((val+1,r));
+            }
+            true
+        } else {
+            false
+        }
+    }
+    fn mex(&self) -> usize {
+        if let Some((_,r))=self.includes(0) {
+            r+1
+        } else {
+            0
+        }
+    }
+}
+
+impl SetOfRanges<isize> for std::collections::BTreeSet<(isize,isize)> {
+    fn new() -> Self {
+        std::collections::BTreeSet::default()
+    }
+    fn includes(&self, val: isize) -> Option<(isize,isize)> {
+        if let Some(&range)=self.range(..(val+1,val+1)).last() {
+            if val<=range.1 {
+                Some(range)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+    fn insert_one(&mut self, val: isize) -> bool {
+        if self.includes(val).is_none() {
+            if let Some((l,_))=self.includes(val-1) {
+                if let Some((_,r))=self.includes(val+1) {
+                    self.remove(&(l,val-1));
+                    self.remove(&(val+1,r));
+                    self.insert((l,r));
+                } else {
+                    self.remove(&(l,val-1));
+                    self.insert((l,val));
+                }
+            } else {
+                if let Some((_,r))=self.includes(val+1) {
+                    self.remove(&(val+1,r));
+                    self.insert((val,r));
+                } else {
+                    self.insert((val,val));
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+    fn remove_one(&mut self, val: isize) -> bool {
+        if let Some((l,r))=self.includes(val) {
+            self.remove(&(l,r));
+            if l!=val {
+                if r!=val {
+                    self.insert((l,val-1));
+                    self.insert((val+1,r));
+                } else {
+                    self.insert((l,val-1));
+                }
+            } else if r!=val {
+                self.insert((val+1,r));
+            }
+            true
+        } else {
+            false
+        }
+    }
+    fn mex(&self) -> isize {
+        if let Some((_,r))=self.includes(0) {
+            r+1
+        } else {
+            0
+        }
+    }
+}
+
+/// 座標圧縮のトレイト（0-indexed）
+pub trait Compress where Self: Sized {
+    /// 圧縮した結果の型
+    type T1;
+    /// 圧縮する前の値の型
+    type T2;
+    /// 座標圧縮し、圧縮した結果と圧縮する前の値の一覧を返す関数（0-indexed）
+    fn compress(&self) -> (Self::T1, Self::T2);
 }
 
 /// ランレングス圧縮のトレイト
@@ -2622,19 +2906,65 @@ impl<T> RationalReconstruct for Vec<T> where T: RationalReconstruct {
     }
 }
 
-/// プリミティブな整数型についてimplを定義するマクロ（別のジェネリクスと併用したい場合などに使用）
-macro_rules! impl_integer {
+/// isizeとusizeについてimplを定義するマクロ（別のジェネリクスと併用したい場合などに使用）
+macro_rules! impl_iusize {
     ($($ty:ty),*) => {
         $(
-            impl Zero for $ty {
-                fn zero_val() -> Self {
-                    0
+            impl Compress for Vec<$ty> {
+                type T1 = Vec<usize>;
+                type T2 = Vec<$ty>;
+                fn compress(&self) -> (Self::T1, Self::T2) {
+                    let mut list=self.clone();
+                    list.sort();
+                    list.dedup();
+                    let len=list.len();
+                    let mut nums=vec![0;self.len()];
+                    for i in 0..self.len() {
+                        nums[i]=binary_search(0, len, |mid| list[mid]<=self[i]);
+                    }
+                    (nums,list)
                 }
             }
 
-            impl One for $ty {
-                fn one_val() -> Self {
-                    1
+            impl Compress for Vec<Vec<$ty>> {
+                type T1 = Vec<Vec<usize>>;
+                type T2 = Vec<$ty>;
+                fn compress(&self) -> (Self::T1, Self::T2) {
+                    let mut list=Vec::new();
+                    for i in 0..self.len() {
+                        for j in 0..self[i].len() {
+                            list.push(self[i][j].clone());
+                        }
+                    }
+                    let len=list.len();
+                    let mut nums=vec_range(0, self.len(), |i| vec![0;self[i].len()]);
+                    for i in 0..self.len() {
+                        for j in 0..self[i].len() {
+                            nums[i][j]=binary_search(0, len, |mid| list[mid]<=self[i][j]);
+                        }
+                    }
+                    (nums,list)
+                }
+            }
+
+            impl Compress for Vec<($ty,$ty)> {
+                type T1 = Vec<(usize,usize)>;
+                type T2 = Vec<$ty>;
+                fn compress(&self) -> (Self::T1, Self::T2) {
+                    let mut list=Vec::new();
+                    for i in 0..self.len() {
+                        list.push(self[i].0.clone());
+                        list.push(self[i].1.clone());
+                    }
+                    list.sort();
+                    list.dedup();
+                    let len=list.len();
+                    let mut nums=vec![(0,0);self.len()];
+                    for i in 0..self.len() {
+                        nums[i].0=binary_search(0, len, |mid| list[mid]<=self[i].0);
+                        nums[i].1=binary_search(0, len, |mid| list[mid]<=self[i].1);
+                    }
+                    (nums,list)
                 }
             }
 
@@ -2708,6 +3038,27 @@ macro_rules! impl_integer {
                     debug_assert!(a<=b);
                     self.left_offset+=a;
                     self.right_offset+=b;
+                }
+            }
+        )*
+    }
+}
+
+impl_iusize!(isize, usize);
+
+/// プリミティブな整数型についてimplを定義するマクロ（別のジェネリクスと併用したい場合などに使用）
+macro_rules! impl_integer {
+    ($($ty:ty),*) => {
+        $(
+            impl Zero for $ty {
+                fn zero_val() -> Self {
+                    0
+                }
+            }
+
+            impl One for $ty {
+                fn one_val() -> Self {
+                    1
                 }
             }
         )*
