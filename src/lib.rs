@@ -821,6 +821,52 @@ pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f
     ok
 }
 
+/// 広義の尺取り法を行う関数（increaseは左側の値に対して右側の値が単調増加であるか、satisfiedは返す境界がdetermineを満たすかどうか）（返り値はイテレータ）
+pub fn two_pointers<F>(n: usize, m: usize, increase: bool, satisfied: bool, determine: &F) -> impl Iterator<Item=(usize,Option<usize>)> + '_ where F: Fn(usize,usize) -> bool {
+    let mut r=if increase {
+        -1
+    } else {
+        m as isize
+    };
+    (0..n).map(move |l| {
+        if increase {
+            while ((r+1) as usize)<m && determine(l,(r+1) as usize) {
+                r+=1;
+            }
+            if satisfied {
+                if r>=0 {
+                    (l,Some(r as usize))
+                } else {
+                    (l,None)
+                }
+            } else {
+                if ((r+1) as usize)<m {
+                    (l,Some((r+1) as usize))
+                } else {
+                    (l,None)
+                }
+            }
+        } else {
+            while r-1>=0 && determine(l,(r-1) as usize) {
+                r-=1;
+            }
+            if satisfied {
+                if (r as usize)<m {
+                    (l,Some(r as usize))
+                } else {
+                    (l,None)
+                }
+            } else {
+                if r-1>=0 {
+                    (l,Some((r-1) as usize))
+                } else {
+                    (l,None)
+                }
+            }
+        }
+    })
+}
+
 /// 最小値を取り出すことのできる優先度つきキューの構造体
 #[derive(Clone, Default, Debug)]
 pub struct RevBinaryHeap<T> where T: Ord {
@@ -2097,15 +2143,15 @@ impl<T> WeightedUnionHeuristic for std::collections::BinaryHeap<T> where T: Ord 
 pub trait MeetInTheMiddle where Self: Sized + std::ops::Index<usize>, Self::Output: Sized {
     /// 半分全列挙によりvalと一致する部分和が存在するか判定する関数
     fn meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> bool where F1: Fn(Self::Output,Self::Output) -> Self::Output;
-    /// 半分全列挙によりval以下の部分和が存在するか判定し、存在するならばその最大値を返す関数（返り値の型はOption）
-    fn min_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
     /// 半分全列挙によりval以上の部分和が存在するか判定し、存在するならばその最小値を返す関数（返り値の型はOption）
+    fn min_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
+    /// 半分全列挙によりval以下の部分和が存在するか判定し、存在するならばその最大値を返す関数（返り値の型はOption）
     fn max_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Self::Output> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
     /// 半分全列挙によりvalと一致する部分和が存在するか判定し、存在するならばその例に各要素が含まれるかを返す関数（返り値の型はOption）
     fn example_using_meet_in_the_middle<F1>(&self, e: Self::Output, sum: F1, val: Self::Output) -> Option<Vec<bool>> where F1: Fn(Self::Output,Self::Output) -> Self::Output;
 }
 
-impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd + std::fmt::Debug {
+impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
     fn meet_in_the_middle<F1>(&self, e: T, sum: F1, val: T) -> bool where F1: Fn(T,T) -> T {
         let len=self.len();
         let mid=self.len()/2;
@@ -2121,15 +2167,13 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd + std::fmt
             let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
             right_set=merge_vecs(&right_1, &right_2);
         }
-        let mut r=-1;
-        for &l in left_set.iter().rev() {
-            r+=1;
-            while r<right_set.len() as isize && sum(l,right_set[r as usize])<=val {
-                r+=1;
-            }
-            r-=1;
-            if r>=0 && sum(l,right_set[r as usize])==val {
-                return true;
+        for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
+            sum(left_set[i],right_set[j])>=val
+        }) {
+            if let Some(r)=r {
+                if sum(left_set[l],right_set[r])==val {
+                    return true;
+                }
             }
         }
         false
@@ -2150,21 +2194,17 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd + std::fmt
             right_set=merge_vecs(&right_1, &right_2);
         }
         let mut ans=None;
-        let mut r=right_set.len() as isize;
-        for l in left_set {
-            r-=1;
-            while r>=0 && sum(l,right_set[r as usize])>=val {
-                r-=1;
-            }
-            r+=1;
-            if (r as usize)<right_set.len() {
-                let s=sum(l,right_set[r as usize]);
+        for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
+            sum(left_set[i],right_set[j])>=val
+        }) {
+            if let Some(r)=r {
+                let tmp=sum(left_set[l],right_set[r]);
                 if ans.is_some() {
-                    if s<ans.unwrap() {
-                        ans=Some(s);
+                    if tmp<ans.unwrap() {
+                        ans=Some(tmp);
                     }
                 } else {
-                    ans=Some(s);
+                    ans=Some(tmp);
                 }
             }
         }
@@ -2186,21 +2226,17 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd + std::fmt
             right_set=merge_vecs(&right_1, &right_2);
         }
         let mut ans=None;
-        let mut r=-1;
-        for &l in left_set.iter().rev() {
-            r+=1;
-            while r<right_set.len() as isize && sum(l,right_set[r as usize])<=val {
-                r+=1;
-            }
-            r-=1;
-            if r>=0 {
-                let s=sum(l,right_set[r as usize]);
+        for (l,r) in two_pointers(left_set.len(), right_set.len(), false, false, &|i,j| {
+            sum(left_set[i],right_set[j])>val
+        }) {
+            if let Some(r)=r {
+                let tmp=sum(left_set[l],right_set[r]);
                 if ans.is_some() {
-                    if s>ans.unwrap() {
-                        ans=Some(s);
+                    if tmp>ans.unwrap() {
+                        ans=Some(tmp);
                     }
                 } else {
-                    ans=Some(s);
+                    ans=Some(tmp);
                 }
             }
         }
@@ -2221,21 +2257,19 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd + std::fmt
             let right_2=vec_range(0, 1<<i, |j| (sum(right_1[j].0,self[mid+i]),right_1[j].1+(1<<(mid+i))));
             right_set=merge_vecs(&right_1, &right_2);
         }
-        let mut r=-1;
-        for &(l,lset) in left_set.iter().rev() {
-            r+=1;
-            while r<right_set.len() as isize && sum(l,right_set[r as usize].0)<=val {
-                r+=1;
-            }
-            r-=1;
-            if r>=0 && sum(l,right_set[r as usize].0)==val {
-                let mut sets=lset+right_set[r as usize].1;
-                let mut ret=vec![false;len];
-                for i in 0..len {
-                    ret[i]=sets%2>0;
-                    sets/=2;
+        for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
+            sum(left_set[i].0,right_set[j].0)>=val
+        }) {
+            if let Some(r)=r {
+                if sum(left_set[l].0,right_set[r].0)==val {
+                    let mut sets=left_set[l].1+right_set[r].1;
+                    let mut ret=vec![false;len];
+                    for i in 0..len {
+                        ret[i]=sets%2>0;
+                        sets/=2;
+                    }
+                    return Some(ret);
                 }
-                return Some(ret);
             }
         }
         None
