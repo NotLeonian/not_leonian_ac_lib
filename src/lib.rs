@@ -801,7 +801,7 @@ pub fn binary_search<T,F>(ok: T, bad: T, determine: F) -> T where T: num::PrimIn
     ok
 }
 
-/// 二分探索の関数（浮動小数点数）
+/// 二分探索の関数（f64）
 pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f64 where F: Fn(f64) -> bool {
     let right=ok>bad;
     let mut ok=ok;
@@ -819,6 +819,29 @@ pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f
         }
     }
     ok
+}
+
+/// 二分探索の関数（usize）（left_is_trueはok<badであるかどうか、返り値はOption）
+pub fn usize_binary_search<F>(max: usize, left_is_true: bool, determine: F) -> Option<usize> where F: Fn(usize) -> bool {
+    if left_is_true {
+        let ret=binary_search(-1, max as isize, |mid| {
+            determine(mid as usize)
+        });
+        if ret>=0 {
+            Some(ret as usize)
+        } else {
+            None
+        }
+    } else {
+        let ret=binary_search(max as isize, -1, |mid| {
+            determine(mid as usize)
+        }) as usize;
+        if ret<max {
+            Some(ret as usize)
+        } else {
+            None
+        }
+    }
 }
 
 /// 広義の尺取り法を行う関数（increaseは左側の値に対して右側の値が単調増加であるか、satisfiedは返す境界がdetermineを満たすかどうか）（返り値はイテレータ）
@@ -3125,27 +3148,6 @@ macro_rules! impl_iusize {
                         for j in 0..self[i].len() {
                             nums[i][j]=binary_search(0, len, |mid| list[mid]<=self[i][j]);
                         }
-                    }
-                    (nums,list)
-                }
-            }
-
-            impl Compress for Vec<($ty,$ty)> {
-                type T1 = Vec<(usize,usize)>;
-                type T2 = Vec<$ty>;
-                fn compress(&self) -> (Self::T1, Self::T2) {
-                    let mut list=Vec::new();
-                    for i in 0..self.len() {
-                        list.push(self[i].0.clone());
-                        list.push(self[i].1.clone());
-                    }
-                    list.sort();
-                    list.dedup();
-                    let len=list.len();
-                    let mut nums=vec![(0,0);self.len()];
-                    for i in 0..self.len() {
-                        nums[i].0=binary_search(0, len, |mid| list[mid]<=self[i].0);
-                        nums[i].1=binary_search(0, len, |mid| list[mid]<=self[i].1);
                     }
                     (nums,list)
                 }
