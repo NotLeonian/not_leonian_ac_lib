@@ -1958,6 +1958,19 @@ pub fn linear_sieve<T>(nmax: T) -> (Vec<T>,Vec<T>) where T: Primes {
     T::linear_sieve(nmax)
 }
 
+/// 拡張ユークリッド互除法を行う関数（返り値はgcd(a,b)であり、x,yにはax+by=gcd(a,b)の1つの解が入る）
+pub fn extended_euclidean_algorithm<T>(a: T, b: T, x: &mut isize, y: &mut isize) -> T where T: num::PrimInt {
+    let mut d=a;
+    if b!=T::zero() {
+        d=extended_euclidean_algorithm(b, a%b, y, x);
+        *y-=(a/b).to_isize().unwrap()*(*x);
+    } else {
+        *x=1;
+        *y=0;
+    }
+    d
+}
+
 /// 2つ以上の数の最大公約数を返すマクロ
 #[macro_export]
 macro_rules! gcd {
@@ -2302,7 +2315,7 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
 /// N1×N2行列の構造体（num::powで行列累乗を計算できる）
 #[derive(Clone, Debug)]
 pub struct Matrix<T, const N1: usize, const N2: usize> {
-    matrix: [[T;N2];N1]
+    pub matrix: [[T;N2];N1]
 }
 
 impl<T, const N1: usize, const N2: usize> std::ops::Deref for Matrix<T,N1,N2> {
@@ -2443,6 +2456,208 @@ impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<
             }
         }
         prod
+    }
+}
+
+/// ローリングハッシュの剰余の定数
+const ROLLING_HASH_MOD:usize=2_305_843_009_213_693_951;
+
+#[derive(Clone, Debug)]
+/// ローリングハッシュの基数の構造体
+pub struct RollingHashBases<const N: usize> {
+    pows: [Vec<usize>;N],
+    invs: [Vec<usize>;N]
+}
+
+impl<const N: usize> RollingHashBases<N> {
+    /// ローリングハッシュの基数をランダムに生成する関数
+    pub fn gen(nmax: usize, sigma: usize) -> Self {
+        const PRIMITIVE_ROOT:usize=37;
+        let pow=|k:usize| {
+            let mut b=1;
+            let mut r=PRIMITIVE_ROOT as u128;
+            let mut k=k;
+            while k>0 {
+                if k%2>0 {
+                    b*=r;
+                    b%=ROLLING_HASH_MOD as u128;
+                }
+                r*=r;
+                r%=ROLLING_HASH_MOD as u128;
+                k/=2;
+            }
+            b as usize
+        };
+        let mut rng=rand::thread_rng();
+        let mut pows=[();N].map(|_| vec![1;nmax+2]);
+        let mut invs=[();N].map(|_| vec![1;nmax+2]);
+        for i in 0..N {
+            let mut k=rand::Rng::gen_range(&mut rng, 0..ROLLING_HASH_MOD-1);
+            let mut b=pow(k);
+            while num_integer::gcd(k, ROLLING_HASH_MOD-1)>1 || b<=sigma {
+                k=rand::Rng::gen_range(&mut rng, 0..ROLLING_HASH_MOD-1);
+                b=pow(k);
+            }
+            let mut inv=0;
+            let mut tmp=0;
+            extended_euclidean_algorithm(b, ROLLING_HASH_MOD, &mut inv, &mut tmp);
+            if inv<0 {
+                inv+=-inv/ROLLING_HASH_MOD as isize*ROLLING_HASH_MOD as isize;
+                inv+=ROLLING_HASH_MOD as isize;
+            }
+            let inv=inv as usize%ROLLING_HASH_MOD;
+            pows[i][1]=b;
+            invs[i][1]=inv;
+            for j in 2..=nmax+1 {
+                let mut next_pow=pows[i][j-1] as u128;
+                next_pow*=b as u128;
+                next_pow%=ROLLING_HASH_MOD as u128;
+                pows[i][j]=next_pow as usize;
+                let mut next_inv=invs[i][j-1] as u128;
+                next_inv*=inv as u128;
+                next_inv%=ROLLING_HASH_MOD as u128;
+                invs[i][j]=next_inv as usize;
+            }
+        }
+        Self { pows, invs }
+    }
+    /// 基数を返す関数
+    pub fn bases(&self) -> [usize;N] {
+        let mut ret=[0;N];
+        for i in 0..N {
+            ret[i]=self.pows[i][1];
+        }
+        ret
+    }
+    /// powsを参照できる関数
+    pub fn get_pows(&self) -> &[Vec<usize>;N] {
+        &self.pows
+    }
+    /// invsを参照できる関数
+    pub fn get_invs(&self) -> &[Vec<usize>;N] {
+        &self.invs
+    }
+}
+
+#[derive(Clone, Debug)]
+/// 累積和によるローリングハッシュの構造体
+pub struct RollingHash<const N: usize> {
+    hashes: [Vec<usize>;N]
+}
+
+impl<const N: usize> RollingHash<N> {
+    /// ハッシュの累積和と基数およびその逆元から部分列のローリングハッシュを返す関数（0-indexedの半開区間）
+    pub fn rolling_hash_of_subsequence(&self, l: usize, r: usize, b: &RollingHashBases<N>) -> [usize;N] {
+        let mut hash=[0;N];
+        for i in 0..N {
+            let n=self.hashes[i].len()-1;
+            let mut tmp=self.hashes[i][r] as u128;
+            tmp+=ROLLING_HASH_MOD as u128;
+            tmp-=self.hashes[i][l] as u128;
+            tmp%=ROLLING_HASH_MOD as u128;
+            tmp*=b.invs[i][n-r] as u128;
+            tmp%=ROLLING_HASH_MOD as u128;
+            hash[i]=tmp as usize;
+        }
+        hash
+    }
+    /// ハッシュの累積和と基数およびその逆元から部分列を結合した列のローリングハッシュを返す関数（0-indexedの半開区間）
+    pub fn sum_of_rolling_hash_of_subsequences(&self, ranges: &Vec<(usize,usize)>, b: &RollingHashBases<N>) -> [usize;N] {
+        let mut hash=[0;N];
+        let mut tmp=[0;N];
+        for &(l,r) in ranges {
+            let h=self.rolling_hash_of_subsequence(l, r, b);
+            for i in 0..N {
+                tmp[i]*=b.pows[i][r-l] as u128;
+                tmp[i]%=ROLLING_HASH_MOD as u128;
+                tmp[i]+=h[i] as u128;
+                tmp[i]%=ROLLING_HASH_MOD as u128;
+            }
+        }
+        for i in 0..N {
+            hash[i]=tmp[i] as usize;
+        }
+        hash
+    }
+}
+
+/// 文字列や数列のトレイト
+pub trait Sequence<const N: usize> {
+    /// 列の中身の型
+    type T;
+    /// 累積和によるローリングハッシュを返す関数
+    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N>;
+}
+
+impl<const N: usize> Sequence<N> for Vec<char> {
+    type T = char;
+    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
+        let n=self.len();
+        let mut hashes=[();N].map(|_| vec![0;n+1]);
+        for i in 0..N {
+            let mut hash=0;
+            for j in 0..n {
+                let c=(self[j] as u128-begin as u128+1)%ROLLING_HASH_MOD as u128;
+                hash+=c*b.pows[i][n-1-j] as u128;
+                hash%=ROLLING_HASH_MOD as u128;
+                hashes[i][j+1]=hash as usize;
+            }
+        }
+        RollingHash { hashes }
+    }
+}
+
+impl<const N: usize> Sequence<N> for Vec<usize> {
+    type T = usize;
+    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
+        let n=self.len();
+        let mut hashes=[();N].map(|_| vec![0;n+1]);
+        for i in 0..N {
+            let mut hash=0;
+            for j in 0..n {
+                let c=(self[j] as u128-begin as u128+1)%ROLLING_HASH_MOD as u128;
+                hash+=c*b.pows[i][n-1-j] as u128;
+                hash%=ROLLING_HASH_MOD as u128;
+                hashes[i][j+1]=hash as usize;
+            }
+        }
+        RollingHash { hashes }
+    }
+}
+
+impl<const N: usize> Sequence<N> for String {
+    type T = char;
+    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
+        self.chars().collect::<Vec<_>>().calculate_rolling_hashes(begin, b)
+    }
+}
+
+/// ローリングハッシュのモノイドの構造体
+pub struct DynamicRollingHash<const N: usize>;
+
+impl<const N: usize> ac_library::Monoid for DynamicRollingHash<N> {
+    type S = ([usize;N],[usize;N]);
+    fn identity() -> Self::S {
+        ([0;N],[1;N])
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        let &(a_hashes,a_pows)=a;
+        let &(b_hashes,b_pows)=b;
+        let mut hashes=[0;N];
+        let mut pows=[1;N];
+        for i in 0..N {
+            let mut hash=a_hashes[i] as u128;
+            hash*=b_pows[i] as u128;
+            hash%=ROLLING_HASH_MOD as u128;
+            hash+=b_hashes[i] as u128;
+            hash%=ROLLING_HASH_MOD as u128;
+            hashes[i]=hash as usize;
+            let mut pow=a_pows[i] as u128;
+            pow*=b_pows[i] as u128;
+            pow%=ROLLING_HASH_MOD as u128;
+            pows[i]=pow as usize;
+        }
+        (hashes,pows)
     }
 }
 
