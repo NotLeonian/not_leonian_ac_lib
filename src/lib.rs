@@ -2862,8 +2862,8 @@ impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float
     }
 }
 
-/// NTT素数のベクターで形式的冪級数を扱うトレイト
-pub trait FPS {
+/// NTT素数のベクターで形式的冪級数を扱うトレイト（計算によって次数が変わるものはdegで結果の次数を指定）
+pub trait FPS where Self: Sized {
     /// 形式的冪級数の和を割り当てる関数
     fn fps_add_assign(&mut self, g: &Self);
     /// 形式的冪級数の和を返す関数
@@ -2877,15 +2877,15 @@ pub trait FPS {
     /// 形式的冪級数の定数倍を返す関数
     fn scalar(f: &Self, k: isize) -> Self;
     /// 形式的冪級数の積を割り当てる関数
-    fn fps_mul_assign(&mut self, g: &Self);
+    fn fps_mul_assign(&mut self, g: &Self, deg: usize);
     /// 形式的冪級数の積を返す関数
-    fn mul(f: &Self, g: &Self) -> Self;
+    fn mul(f: &Self, g: &Self, deg: usize) -> Self;
     /// 形式的冪級数の逆元を返す関数
-    fn fps_inv(&self) -> Self;
+    fn fps_inv(&self, deg: usize) -> Self;
     /// 形式的冪級数の商を割り当てる関数
-    fn fps_div_assign(&mut self, g: &Self);
+    fn fps_div_assign(&mut self, g: &Self, deg: usize);
     /// 形式的冪級数の商を返す関数
-    fn div(f: &Self, g: &Self) -> Self;
+    fn div(f: &Self, g: &Self, deg: usize) -> Self;
     /// 形式的冪級数の導関数を割り当てる関数
     fn fps_diff_assign(&mut self);
     /// 形式的冪級数の導関数を返す関数
@@ -2895,49 +2895,46 @@ pub trait FPS {
     /// 形式的冪級数の定積分を返す関数
     fn fps_int(&self) -> Self;
     /// 形式的冪級数の対数を割り当てる関数
-    fn fps_log_assign(&mut self);
+    fn fps_log_assign(&mut self, deg: usize);
     /// 形式的冪級数の対数を返す関数
-    fn fps_log(&self) -> Self;
+    fn fps_log(&self, deg: usize) -> Self;
     /// 形式的冪級数の指数を割り当てる関数
-    fn fps_exp_assign(&mut self);
+    fn fps_exp_assign(&mut self, deg: usize);
     /// 形式的冪級数の指数を返す関数
-    fn fps_exp(&self) -> Self;
+    fn fps_exp(&self, deg: usize) -> Self;
     /// 形式的冪級数の冪を割り当てる関数
-    fn fps_pow_assign(&mut self, k: usize);
+    fn fps_pow_assign(&mut self, k: usize, deg: usize);
     /// 形式的冪級数の冪を返す関数
-    fn fps_pow(&self, k: usize) -> Self;
+    fn fps_pow(&self, k: usize, deg: usize) -> Self;
+    /// 形式的冪級数の配列を受け取ってその総積を計算し、配列を破壊して最初の要素に総積を代入する関数
+    fn fps_prod_merge(fs: &mut Vec<Self>);
 }
 
 impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     fn fps_add_assign(&mut self, g: &Self) {
-        debug_assert_eq!(self.len(), g.len());
-        let n=self.len()-1;
-        for i in 0..=n {
+        self.resize(max(self.len(),g.len()), ac_library::StaticModInt::<M>::new(0));
+        for i in 0..g.len() {
             self[i]+=g[i];
         }
     }
     fn add(f: &Self, g: &Self) -> Self {
-        debug_assert_eq!(f.len(), g.len());
         let mut h=f.clone();
         h.fps_add_assign(&g);
         h
     }
     fn fps_sub_assign(&mut self, g: &Self) {
-        debug_assert_eq!(self.len(), g.len());
-        let n=self.len()-1;
-        for i in 0..=n {
+        self.resize(max(self.len(),g.len()), ac_library::StaticModInt::<M>::new(0));
+        for i in 0..g.len() {
             self[i]-=g[i];
         }
     }
     fn sub(f: &Self, g: &Self) -> Self {
-        debug_assert_eq!(f.len(), g.len());
         let mut h=f.clone();
         h.fps_sub_assign(&g);
         h
     }
     fn fps_scalar_assign(&mut self, k: isize) {
-        let n=self.len()-1;
-        for i in 0..=n {
+        for i in 0..self.len() {
             self[i]*=k;
         }
     }
@@ -2946,47 +2943,45 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         h.fps_scalar_assign(k);
         h
     }
-    fn fps_mul_assign(&mut self, g: &Self) {
-        debug_assert_eq!(self.len(), g.len());
-        let n=self.len()-1;
-        let h=FPS::mul(self, g);
-        for i in 0..=n {
+    fn fps_mul_assign(&mut self, g: &Self, deg: usize) {
+        let h=FPS::mul(self, g, deg);
+        self.resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+        for i in 0..=deg {
             self[i]=h[i];
         }
     }
-    fn mul(f: &Self, g: &Self) -> Self {
-        debug_assert_eq!(f.len(), g.len());
-        let n=f.len()-1;
-        ac_library::convolution::convolution(&f[0..=n], &g[0..=n])[0..=n].to_vec()
+    fn mul(f: &Self, g: &Self, deg: usize) -> Self {
+        let mut conv=ac_library::convolution::convolution(&f[0..], &g[0..]);
+        if conv.len()>deg {
+            conv[0..=deg].to_vec()
+        } else {
+            conv.resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+            conv
+        }
     }
-    fn fps_inv(&self) -> Self {
-        let n=self.len()-1;
-        let mut inv=vec![ac_library::StaticModInt::<M>::new(0);n+1];
+    fn fps_inv(&self, deg: usize) -> Self {
+        let mut inv=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
         inv[0]=self[0].inv();
         let mut curdeg=1;
-        while curdeg<=n {
+        while curdeg<=deg {
             curdeg*=2;
-            let mut f=self[0..std::cmp::min(curdeg,n+1)].to_vec();
-            let mut g=vec![ac_library::StaticModInt::<M>::new(0);std::cmp::min(curdeg,n+1)];
-            for i in 0..curdeg/2 {
-                g[i]=inv[i];
-            }
-            f.fps_mul_assign(&g);
-            f.fps_mul_assign(&g);
-            for i in curdeg/2..std::cmp::min(curdeg,n+1) {
+            let mut f=self[0..min(min(curdeg,deg+1),self.len())].to_vec();
+            let g=inv[0..curdeg/2].to_vec();
+            f.fps_mul_assign(&g, min(curdeg-1,deg));
+            f.fps_mul_assign(&g, min(curdeg-1,deg));
+            for i in curdeg/2..min(curdeg,deg+1) {
                 inv[i]-=f[i];
             }
         }
         inv
     }
-    fn fps_div_assign(&mut self, g: &Self) {
-        debug_assert_eq!(self.len(), g.len());
-        self.fps_mul_assign(&g.fps_inv());
+    fn fps_div_assign(&mut self, g: &Self, deg: usize) {
+        self.resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+        self.fps_mul_assign(&g.fps_inv(deg), deg);
     }
-    fn div(f: &Self, g: &Self) -> Self {
-        debug_assert_eq!(f.len(), g.len());
+    fn div(f: &Self, g: &Self, deg: usize) -> Self {
         let mut h=f.clone();
-        h.fps_div_assign(&g);
+        h.fps_div_assign(&g, deg);
         h
     }
     fn fps_diff_assign(&mut self) {
@@ -2994,6 +2989,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         for i in 0..n {
             self[i]=self[i+1]*(i+1);
         }
+        self[n]=ac_library::StaticModInt::<M>::new(0);
     }
     fn fps_diff(&self) -> Self {
         let mut h=self.clone();
@@ -3012,74 +3008,89 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         h.fps_int_assign();
         h
     }
-    fn fps_log_assign(&mut self) {
-        let n=self.len()-1;
-        let h=FPS::fps_log(self);
-        for i in 0..=n {
+    fn fps_log_assign(&mut self, deg: usize) {
+        self.resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+        let h=FPS::fps_log(self, deg);
+        for i in 0..=deg {
             self[i]=h[i];
         }
     }
-    fn fps_log(&self) -> Self {
+    fn fps_log(&self, deg: usize) -> Self {
         let mut h=self.clone();
         h.fps_diff_assign();
-        h.fps_div_assign(self);
+        h.fps_div_assign(self, deg);
         h.fps_int_assign();
         h
     }
-    fn fps_exp_assign(&mut self) {
-        let n=self.len()-1;
-        let h=FPS::fps_exp(self);
-        for i in 0..=n {
+    fn fps_exp_assign(&mut self, deg: usize) {
+        self.resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+        let h=FPS::fps_exp(self, deg);
+        for i in 0..=deg {
             self[i]=h[i];
         }
     }
-    fn fps_exp(&self) -> Self {
+    fn fps_exp(&self, deg: usize) -> Self {
         debug_assert_eq!(self[0], ac_library::StaticModInt::<M>::new(0));
-        let n=self.len()-1;
-        let mut exp=vec![ac_library::StaticModInt::<M>::new(0);n+1];
-        exp[0]=ac_library::StaticModInt::<M>::new(1);
+        let mut exp=vec![ac_library::StaticModInt::<M>::new(1)];
         let mut curdeg=1;
-        while curdeg<=n {
+        while curdeg<=deg {
             curdeg*=2;
-            let mut fc=vec![ac_library::StaticModInt::<M>::new(0);n+1];
-            for i in 0..std::cmp::min(curdeg,n+1) {
+            let mut fc=vec![ac_library::StaticModInt::<M>::new(0);min(curdeg,deg+1)];
+            for i in 0..min(min(curdeg,deg+1), self.len()) {
                 fc[i]=self[i];
             }
-            fc.fps_sub_assign(&FPS::fps_log(&exp));
+            fc.fps_sub_assign(&FPS::fps_log(&exp, min(curdeg-1,deg)));
             fc[0]+=1;
-            exp.fps_mul_assign(&fc);
+            exp.fps_mul_assign(&fc, min(curdeg-1,deg));
         }
         exp
     }
-    fn fps_pow_assign(&mut self, k: usize) {
-        let n=self.len()-1;
+    fn fps_pow_assign(&mut self, k: usize, deg: usize) {
+        self.resize(deg+1, ac_library::StaticModInt::<M>::new(0));
         let mut lower=(ac_library::StaticModInt::<M>::new(1),0);
-        for i in 0..=n {
+        for i in 0..=deg {
             if self[i]!=ac_library::StaticModInt::<M>::new(0) {
                 lower=(self[i],i);
                 break;
             }
         }
-        for i in 0..=n-lower.1 {
+        for i in 0..=deg-lower.1 {
             self[i]=self[i+lower.1]/lower.0;
         }
-        for i in n-lower.1+1..=n {
+        for i in deg-lower.1+1..=deg {
             self[i]=ac_library::StaticModInt::<M>::new(0);
         }
-        self.fps_log_assign();
+        self.fps_log_assign(deg);
         self.fps_scalar_assign(k as isize);
-        self.fps_exp_assign();
-        for i in (lower.1*k..=n).rev() {
+        self.fps_exp_assign(deg);
+        for i in (lower.1*k..=deg).rev() {
             self[i]=self[i-lower.1*k]*lower.0.pow(k as u64);
         }
-        for i in 0..std::cmp::min(lower.1*k,n+1) {
+        for i in 0..min(lower.1*k,deg+1) {
             self[i]=ac_library::StaticModInt::<M>::new(0);
         }
     }
-    fn fps_pow(&self, k: usize) -> Self {
+    fn fps_pow(&self, k: usize, deg: usize) -> Self {
         let mut h=self.clone();
-        h.fps_pow_assign(k);
+        h.fps_pow_assign(k, deg);
         h
+    }
+    fn fps_prod_merge(fs: &mut Vec<Self>) {
+        let len=fs.len();
+        let mut pq=RevBinaryHeap::<(usize,usize)>::new();
+        for i in 0..len {
+            pq.push((fs[i].len()-1,i));
+        }
+        while let Some((l_deg,mut l_i))=pq.pop() {
+            if let Some((r_deg,mut r_i))=pq.pop() {
+                if l_i>r_i {
+                    std::mem::swap(&mut l_i, &mut r_i);
+                }
+                let tmp=std::mem::take(&mut fs[r_i]);
+                fs[l_i].fps_mul_assign(&tmp, l_deg+r_deg);
+                pq.push((l_deg+r_deg,l_i));
+            }
+        }
     }
 }
 
