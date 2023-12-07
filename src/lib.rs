@@ -2218,6 +2218,33 @@ impl Nimber for Vec<usize> {
     }
 }
 
+/// 累積XORについてのトレイト
+pub trait PrefixXOR {
+    /// 累積XORのベクターを構築する関数（kが0の場合は通常の累積XOR、k>0の場合はk個以下の個数制限ありのNimber）
+    fn construct_prefix_xor(&self, k: usize) -> Self;
+    /// 構築した累積XORのベクターから部分XORを計算する関数（0-indexedの左閉右開区間）
+    fn calculate_partial_xor(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
+}
+
+impl PrefixXOR for Vec<usize> {
+    fn construct_prefix_xor(&self, k: usize) -> Self {
+        let mut prefix_xor=vec![0;self.len()+1];
+        for i in 0..self.len() {
+            prefix_xor[i+1]=prefix_xor[i]^if k==0 {
+                self[i]
+            } else {
+                self[i]%(k+1)
+            };
+        }
+        prefix_xor
+    }
+    fn calculate_partial_xor(&self, l: usize, r: usize) -> usize {
+        debug_assert!(l < self.len());
+        debug_assert!(r <= self.len());
+        self[r]^self[l]
+    }
+}
+
 /// データ構造のベクターについてマージテクを行うトレイト（現状はVec、BTreeSet、BinaryHeapにのみ実装）
 pub trait VecWeightedUnionHeuristic {
     /// データ構造のベクターについてマージテクを行う関数（現状はVec、BTreeSet、BinaryHeapにのみ実装）
@@ -2574,11 +2601,36 @@ impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<
     }
 }
 
+/// 簡易的なハッシュの構造体
+#[derive(Clone, Debug)]
+pub struct Hashes<T> {
+    rng: rand::rngs::ThreadRng,
+    hash_numbers: std::collections::BTreeMap<T,usize>
+}
+
+impl<T> Hashes<T> where T: Clone + Ord {
+    /// 初期化の関数
+    pub fn new() -> Self {
+        Hashes { rng: rand::thread_rng(), hash_numbers: std::collections::BTreeMap::<_,_>::default() }
+    }
+    /// 既にハッシュが決まっているかどうかを返す関数
+    pub fn is_assigned_hash(&self, a: T) -> bool {
+        self.hash_numbers.contains_key(&a)
+    }
+    /// aのハッシュを返す関数
+    pub fn hash(&mut self, a: T) -> usize {
+        if !self.hash_numbers.contains_key(&a) {
+            self.hash_numbers.insert(a.clone(), rand::Rng::gen_range(&mut self.rng, 1..(1<<60)));
+        }
+        *self.hash_numbers.get(&a).unwrap()
+    }
+}
+
 /// ローリングハッシュの剰余の定数
 const ROLLING_HASH_MOD:usize=2_305_843_009_213_693_951;
 
-#[derive(Clone, Debug)]
 /// ローリングハッシュの基数の構造体
+#[derive(Clone, Debug)]
 pub struct RollingHashBases<const N: usize> {
     pows: [Vec<usize>;N],
     invs: [Vec<usize>;N]
@@ -2654,14 +2706,14 @@ impl<const N: usize> RollingHashBases<N> {
     }
 }
 
-#[derive(Clone, Debug)]
 /// 累積和によるローリングハッシュの構造体
+#[derive(Clone, Debug)]
 pub struct RollingHash<const N: usize> {
     hashes: [Vec<usize>;N]
 }
 
 impl<const N: usize> RollingHash<N> {
-    /// ハッシュの累積和と基数およびその逆元から部分列のローリングハッシュを返す関数（0-indexedの半開区間）
+    /// ハッシュの累積和と基数およびその逆元から部分列のローリングハッシュを返す関数（0-indexedの左閉右開区間）
     pub fn rolling_hash_of_subsequence(&self, l: usize, r: usize, b: &RollingHashBases<N>) -> [usize;N] {
         let mut hash=[0;N];
         for i in 0..N {
@@ -2676,7 +2728,7 @@ impl<const N: usize> RollingHash<N> {
         }
         hash
     }
-    /// ハッシュの累積和と基数およびその逆元から部分列を結合した列のローリングハッシュを返す関数（0-indexedの半開区間）
+    /// ハッシュの累積和と基数およびその逆元から部分列を結合した列のローリングハッシュを返す関数（0-indexedの左閉右開区間）
     pub fn sum_of_rolling_hash_of_subsequences(&self, ranges: &Vec<(usize,usize)>, b: &RollingHashBases<N>) -> [usize;N] {
         let mut hash=[0;N];
         let mut tmp=[0;N];
@@ -2697,16 +2749,16 @@ impl<const N: usize> RollingHash<N> {
 }
 
 /// 文字列や数列のトレイト
-pub trait Sequence<const N: usize> {
+pub trait Sequence where Self: Sized {
     /// 列の中身の型
     type T;
     /// 累積和によるローリングハッシュを返す関数
-    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N>;
+    fn calculate_rolling_hashes<const N: usize>(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N>;
 }
 
-impl<const N: usize> Sequence<N> for Vec<char> {
+impl Sequence for Vec<char> {
     type T = char;
-    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
+    fn calculate_rolling_hashes<const N: usize>(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
         let n=self.len();
         let mut hashes=[();N].map(|_| vec![0;n+1]);
         for i in 0..N {
@@ -2722,9 +2774,9 @@ impl<const N: usize> Sequence<N> for Vec<char> {
     }
 }
 
-impl<const N: usize> Sequence<N> for Vec<usize> {
+impl Sequence for Vec<usize> {
     type T = usize;
-    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
+    fn calculate_rolling_hashes<const N: usize>(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
         let n=self.len();
         let mut hashes=[();N].map(|_| vec![0;n+1]);
         for i in 0..N {
@@ -2740,9 +2792,9 @@ impl<const N: usize> Sequence<N> for Vec<usize> {
     }
 }
 
-impl<const N: usize> Sequence<N> for String {
+impl Sequence for String {
     type T = char;
-    fn calculate_rolling_hashes(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
+    fn calculate_rolling_hashes<const N: usize>(&self, begin: Self::T, b: &RollingHashBases<N>) -> RollingHash<N> {
         self.chars().collect::<Vec<_>>().calculate_rolling_hashes(begin, b)
     }
 }
