@@ -1997,6 +1997,95 @@ pub fn extended_euclidean_algorithm<T>(a: T, b: T, x: &mut isize, y: &mut isize)
     d
 }
 
+/// 平方剰余のトレイト
+pub trait QuadraticResidue where Self: Sized {
+    /// 平方剰余か判定する関数
+    fn is_quadratic_residue(&self) -> bool;
+    /// 2乗した剰余がselfになる数の片方を返す関数（返り値はOption）
+    fn mod_sqrt(&self) -> Option<Self>;
+}
+
+impl<M> QuadraticResidue for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn is_quadratic_residue(&self) -> bool {
+        debug_assert!(M::HINT_VALUE_IS_PRIME);
+        self.pow((M::VALUE as u64-1)/2)==Self::new(1)
+    }
+    fn mod_sqrt(&self) -> Option<Self> {
+        if !self.is_quadratic_residue() {
+            return None;
+        }
+        if *self==Self::new(0) || M::VALUE==2 {
+            return Some(self.clone());
+        }
+        if M::VALUE%4==3 {
+            return Some(self.pow((M::VALUE as u64+1)/4));
+        }
+        let mut b=Self::new(1);
+        while b.pow((M::VALUE as u64-1)/2)==Self::new(1) {
+            b+=1;
+        }
+        let mut q=M::VALUE as usize-1;
+        let q_digit=q.trailing_zeros();
+        q>>=q_digit;
+        let mut x=self.pow((q as u64+1)/2);
+        b=b.pow(q as u64);
+        let mut shift=2;
+        while x*x!=*self {
+            let err=self.inv()*x*x;
+            if err.pow(1<<(q_digit-shift))!=Self::new(1) {
+                x*=b;
+            }
+            b*=b;
+            shift+=1;
+        }
+        if x.val()<(-x).val() {
+            Some(x)
+        } else {
+            Some(-x)
+        }
+    }
+}
+
+impl<I> QuadraticResidue for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn is_quadratic_residue(&self) -> bool {
+        self.pow((Self::modulus() as u64-1)/2)==Self::new(1)
+    }
+    fn mod_sqrt(&self) -> Option<Self> {
+        if !self.is_quadratic_residue() {
+            return None;
+        }
+        if *self==Self::new(0) || Self::modulus()==2 {
+            return Some(self.clone());
+        }
+        if Self::modulus()%4==3 {
+            return Some(self.pow((Self::modulus() as u64+1)/4));
+        }
+        let mut b=Self::new(1);
+        while b.pow((Self::modulus() as u64-1)/2)==Self::new(1) {
+            b+=1;
+        }
+        let mut q=Self::modulus() as usize-1;
+        let q_digit=q.trailing_zeros();
+        q>>=q_digit;
+        let mut x=self.pow((q as u64+1)/2);
+        b=b.pow(q as u64);
+        let mut shift=2;
+        while x*x!=*self {
+            let err=self.inv()*x*x;
+            if err.pow(1<<(q_digit-shift))!=Self::new(1) {
+                x*=b;
+            }
+            b*=b;
+            shift+=1;
+        }
+        if x.val()<(-x).val() {
+            Some(x)
+        } else {
+            Some(-x)
+        }
+    }
+}
+
 /// 2つ以上の数の最大公約数を返すマクロ
 #[macro_export]
 macro_rules! gcd {
@@ -2936,6 +3025,10 @@ pub trait FPS where Self: Sized {
     fn fps_pow_assign(&mut self, k: usize, deg: usize);
     /// 形式的冪級数の冪を返す関数
     fn fps_pow(&self, k: usize, deg: usize) -> Self;
+    /// 形式的冪級数の平方根を割り当てる関数
+    fn fps_sqrt_assign(&mut self, deg: usize);
+    /// 形式的冪級数の平方根を返す関数
+    fn fps_sqrt(&self, deg: usize) -> Self;
     /// 形式的冪級数の配列を受け取ってその総積を計算し、配列を破壊して最初の要素に総積を代入する関数
     fn fps_prod_merge(fs: &mut Vec<Self>);
 }
@@ -3001,8 +3094,8 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         while curlen<=deg {
             curlen*=2;
             let h=&ac_library::convolution::convolution(&self[0..min(curlen,deg+1)], &inv[0..curlen/2])[0..curlen];
-            let h=&ac_library::convolution::convolution(&h[curlen/2..curlen], &inv[0..curlen/2])[0..min(deg+1,curlen)-curlen/2];
-            for i in curlen/2..min(deg+1,curlen) {
+            let h=&ac_library::convolution::convolution(&h[curlen/2..curlen], &inv[0..curlen/2])[0..min(curlen,deg+1)-curlen/2];
+            for i in curlen/2..min(curlen,deg+1) {
                 inv[i]=-h[i-curlen/2];
             }
         }
@@ -3073,8 +3166,8 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
                 l[i]=l[i-1]/i;
                 l[i]-=self[i];
             }
-            let h=&ac_library::convolution::convolution(&l[curlen/2..curlen], &exp[0..curlen/2])[0..min(deg+1,curlen)-curlen/2];
-            for i in curlen/2..min(deg+1,curlen) {
+            let h=&ac_library::convolution::convolution(&l[curlen/2..curlen], &exp[0..curlen/2])[0..min(curlen,deg+1)-curlen/2];
+            for i in curlen/2..min(curlen,deg+1) {
                 exp[i]-=h[i-curlen/2];
             }
         }
@@ -3112,6 +3205,29 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         let mut h=self.clone();
         h.fps_pow_assign(k, deg);
         h
+    }
+    fn fps_sqrt_assign(&mut self, deg: usize) {
+        debug_assert!(self.len()>deg);
+        *self=FPS::fps_sqrt(self, deg);
+    }
+    fn fps_sqrt(&self, deg: usize) -> Self {
+        debug_assert!(self.len()>deg);
+        let mut sqrt=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
+        sqrt[0]=self[0].mod_sqrt().unwrap();
+        let mut curlen=1;
+        while curlen<=deg {
+            curlen*=2;
+            let mut g=vec![ac_library::StaticModInt::<M>::new(0);min(curlen,deg+1)];
+            for i in 0..curlen/2 {
+                g[i]=sqrt[i]*2;
+            }
+            g=g.fps_inv(min(curlen-1,deg));
+            let h=&ac_library::convolution::convolution(&self[0..min(curlen,deg+1)], &g[0..min(curlen,deg+1)])[curlen/2..min(curlen,deg+1)];
+            for i in curlen/2..min(curlen,deg+1) {
+                sqrt[i]=h[i-curlen/2];
+            }
+        }
+        sqrt
     }
     fn fps_prod_merge(fs: &mut Vec<Self>) {
         let len=fs.len();
