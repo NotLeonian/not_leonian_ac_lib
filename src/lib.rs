@@ -509,6 +509,19 @@ pub fn merge_vecs<T>(a: &Vec<T>, b: &Vec<T>) -> Vec<T> where T: Clone + PartialO
     itertools::Itertools::merge(a.iter(), b.iter()).cloned().collect()
 }
 
+/// do-while文のマクロ
+#[macro_export]
+macro_rules! do_while {
+    ($cond:expr,$block:block) => {
+        loop {
+            $block
+            if !$cond {
+                break;
+            }
+        }
+    };
+}
+
 /// 2次元ベクターによるグラフの型
 pub type VecGraph=Vec<Vec<(usize,usize)>>;
 /// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
@@ -2169,10 +2182,52 @@ impl<T, const N: usize> VecLCM for [T;N] where T: Copy + num::One + num_integer:
     }
 }
 
-/// 区間のそれぞれの要素にアフィン変換を行う遅延セグ木の構造体
-pub struct SegmentAffineTransform<M>(std::marker::PhantomData<M>) where M: ac_library::Monoid;
+/// modintなどで加算を行うモノイドの構造体
+pub struct Add<S>(std::marker::PhantomData<S>);
 
-/// 区間のそれぞれの要素にアフィン変換を行う遅延セグ木のトレイト
+/// modintなどで加算を行うモノイドのトレイト
+impl<S> ac_library::Monoid for Add<S> where S: Copy + std::ops::Add<Output=S> + Zero {
+    type S = S;
+    fn identity() -> Self::S {
+        S::zero_val()
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        *a+*b
+    }
+}
+
+/// modintなどで乗算を行うモノイドの構造体
+pub struct Mul<S>(std::marker::PhantomData<S>);
+
+/// modintなどで乗算を行うモノイドのトレイト
+impl<S> ac_library::Monoid for Mul<S> where S: Copy + std::ops::Mul<Output=S> + One {
+    type S = S;
+    fn identity() -> Self::S {
+        S::one_val()
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        *a**b
+    }
+}
+
+/// 遅延セグ木を双対セグ木として使うためのダミーの二項演算の構造体
+pub struct DummyOperation<S>(std::marker::PhantomData<S>);
+
+/// 遅延セグ木を双対セグ木として使うためのダミーの二項演算の構造体
+impl<S> ac_library::Monoid for DummyOperation<S> where S: Default + Clone {
+    type S = S;
+    fn identity() -> Self::S {
+        S::default()
+    }
+    fn binary_operation(a: &Self::S, _b: &Self::S) -> Self::S {
+        a.clone()
+    }
+}
+
+/// 区間のそれぞれの要素にアフィン変換を行う作用の構造体
+pub struct SegmentAffineTransform<M>(std::marker::PhantomData<M>);
+
+/// 区間のそれぞれの要素にアフィン変換を行う作用のトレイト
 impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + Zero + One {
     type M = M;
     type F = (M::S,M::S);
