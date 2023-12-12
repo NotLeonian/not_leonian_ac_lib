@@ -847,31 +847,28 @@ pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f
     ok
 }
 
-/// 二分探索の関数（usize）（left_is_trueはok<badであるかどうか、返り値はOption）
-pub fn usize_binary_search<F>(max: usize, left_is_true: bool, determine: F) -> Option<usize> where F: Fn(usize) -> bool {
-    if left_is_true {
+/// 二分探索の関数（usize）（ok_is_smallはok<badであるかどうか、-1が答えの場合はmaxが返る）
+pub fn usize_binary_search<F>(max: usize, ok_is_small: bool, determine: F) -> usize where F: Fn(usize) -> bool {
+    if ok_is_small {
         let ret=binary_search(-1, max as isize, |mid| {
             determine(mid as usize)
         });
         if ret>=0 {
-            Some(ret as usize)
+            ret as usize
         } else {
-            None
+            max
         }
     } else {
         let ret=binary_search(max as isize, -1, |mid| {
             determine(mid as usize)
         }) as usize;
-        if ret<max {
-            Some(ret as usize)
-        } else {
-            None
-        }
+        ret
     }
 }
 
-/// 広義の尺取り法を行う関数（increaseは左側の値に対して右側の値が単調増加であるか、satisfiedは返す境界がdetermineを満たすかどうか）（返り値はイテレータ）
-pub fn two_pointers<F>(n: usize, m: usize, increase: bool, satisfied: bool, determine: &F) -> impl Iterator<Item=(usize,Option<usize>)> + '_ where F: Fn(usize,usize) -> bool {
+/// 広義の尺取り法を行う関数（increaseは左側の値に対して右側の値が単調増加であるか、satisfiedは返す境界がdetermineを満たすかどうか）
+/// （返り値はイテレータで、各lに対するrは-1が答えの場合mが返る）
+pub fn two_pointers<F>(n: usize, m: usize, increase: bool, satisfied: bool, determine: &F) -> impl Iterator<Item=(usize,usize)> + '_ where F: Fn(usize,usize) -> bool {
     let mut r=if increase {
         -1
     } else {
@@ -884,32 +881,24 @@ pub fn two_pointers<F>(n: usize, m: usize, increase: bool, satisfied: bool, dete
             }
             if satisfied {
                 if r>=0 {
-                    (l,Some(r as usize))
+                    (l,r as usize)
                 } else {
-                    (l,None)
+                    (l,m)
                 }
             } else {
-                if ((r+1) as usize)<m {
-                    (l,Some((r+1) as usize))
-                } else {
-                    (l,None)
-                }
+                (l,(r+1) as usize)
             }
         } else {
             while r-1>=0 && determine(l,(r-1) as usize) {
                 r-=1;
             }
             if satisfied {
-                if (r as usize)<m {
-                    (l,Some(r as usize))
-                } else {
-                    (l,None)
-                }
+                (l,r as usize)
             } else {
                 if r-1>=0 {
-                    (l,Some((r-1) as usize))
+                    (l,(r-1) as usize)
                 } else {
-                    (l,None)
+                    (l,m)
                 }
             }
         }
@@ -2348,7 +2337,7 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
             sum(left_set[i],right_set[j])>=val
         }) {
-            if let Some(r)=r {
+            if r<right_set.len() {
                 if sum(left_set[l],right_set[r])==val {
                     return true;
                 }
@@ -2375,7 +2364,7 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
             sum(left_set[i],right_set[j])>=val
         }) {
-            if let Some(r)=r {
+            if r<right_set.len() {
                 let tmp=sum(left_set[l],right_set[r]);
                 if ans.is_some() {
                     if tmp<ans.unwrap() {
@@ -2407,7 +2396,7 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         for (l,r) in two_pointers(left_set.len(), right_set.len(), false, false, &|i,j| {
             sum(left_set[i],right_set[j])>val
         }) {
-            if let Some(r)=r {
+            if r<right_set.len() {
                 let tmp=sum(left_set[l],right_set[r]);
                 if ans.is_some() {
                     if tmp>ans.unwrap() {
@@ -2438,7 +2427,7 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
             sum(left_set[i].0,right_set[j].0)>=val
         }) {
-            if let Some(r)=r {
+            if r<right_set.len() {
                 if sum(left_set[l].0,right_set[r].0)==val {
                     let mut sets=left_set[l].1+right_set[r].1;
                     let mut ret=vec![false;len];
