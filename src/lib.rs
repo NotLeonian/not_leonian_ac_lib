@@ -522,6 +522,9 @@ macro_rules! do_while {
     };
 }
 
+/// ModInt998244353を表す型
+pub type Mint=ac_library::ModInt998244353;
+
 /// 2次元ベクターによるグラフの型
 pub type VecGraph=Vec<Vec<(usize,usize)>>;
 /// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
@@ -3530,13 +3533,13 @@ impl<T> BitDigits for T where Self: num::PrimInt {
 }
 
 /// 10のi乗のstatic定数
-pub static E: [usize;19]=gen_e();
+pub static E: [usize;20]=gen_e();
 
 /// 10のi乗のstatic定数を生成するconst関数
-const fn gen_e() -> [usize;19] {
-    let mut e=[1;19];
+const fn gen_e() -> [usize;20] {
+    let mut e=[1;20];
     let mut i=1;
-    while i<19 {
+    while i<20 {
         e[i]=e[i-1]*10;
         i+=1;
     }
