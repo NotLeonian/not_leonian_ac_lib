@@ -24,7 +24,7 @@ macro_rules! debugln {
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{:?} ",$var);
-        outputln!($($vars),+);
+        debugln!($($vars),+);
     };
 }
 
@@ -154,7 +154,7 @@ macro_rules! edebugln {
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
         eprint!("{:?} ",$var);
-        eoutputln!($($vars),+);
+        edebugln!($($vars),+);
     };
 }
 
@@ -3443,6 +3443,485 @@ impl<T> ZetaMobius for Vec<T> where T: Clone + std::ops::Add<Output=T> + std::op
             }
             i<<=1;
         }
+    }
+}
+
+/// AA木上の頂点の型
+type AANode<K,V>=Option<Box<NodeOfAATree<K,V>>>;
+
+/// AA木上の頂点の構造体
+#[derive(Clone, Default, Debug)]
+struct NodeOfAATree<K,V> {
+    key: K,
+    val: V,
+    level: usize,
+    left: AANode<K,V>,
+    right: AANode<K,V>
+}
+
+/// AA木の構造体
+pub struct AATree<K,V> {
+    len: usize,
+    root: AANode<K,V>,
+    operation: Box<dyn FnMut(&mut V,&V,&V) -> ()>,
+    val_of_none: Option<V>
+}
+
+impl<K,V> AATree<K,V> where K: Clone + Default + Eq + Ord, V: Clone + Default {
+    pub fn new() -> Self {
+        AATree { len: 0, root: None, operation: Box::new(|_,_,_| ()), val_of_none: None }
+    }
+    /// 部分木に対する演算と葉の子の値を定義して初期化する関数
+    pub fn new_operation(operation: Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: V) -> Self {
+        AATree { len: 0, root: None, operation, val_of_none: Some(val_of_none) }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len==0
+    }
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    /// keyの参照を返す関数
+    fn get_key(node: &AANode<K,V>) -> &K {
+        if node.is_some() {
+            &node.as_ref().unwrap().key
+        } else {
+            panic!()
+        }
+    }
+    /// valの参照を返す関数
+    fn get_val<'b>(node: &'b AANode<K,V>, val_of_none: &'b Option<V>) -> &'b V {
+        if node.is_some() {
+            &node.as_ref().unwrap().val
+        } else if val_of_none.is_some() {
+            val_of_none.as_ref().unwrap()
+        } else {
+            panic!()
+        }
+    }
+    /// valの可変参照を返す関数
+    fn get_mut_val<'b>(node: &'b mut AANode<K,V>) -> &'b mut V {
+        if node.is_some() {
+            &mut node.as_mut().unwrap().val
+        } else {
+            panic!()
+        }
+    }
+    /// レベルを返す関数
+    fn get_level(node: &AANode<K,V>) -> usize {
+        if node.is_some() {
+            node.as_ref().unwrap().level
+        } else {
+            0
+        }
+    }
+    /// 右回転を行う関数
+    fn rotate_right(node: &mut AANode<K,V>, operation: &mut Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: &Option<V>) {
+        if node.is_some() {
+            if node.as_ref().unwrap().left.is_some() {
+                let mut prev_left=std::mem::take(&mut node.as_mut().unwrap().left);
+                let prev_left_right=std::mem::take(&mut prev_left.as_mut().unwrap().right);
+                node.as_mut().unwrap().left=prev_left_right;
+                if val_of_none.is_some() {
+                    let left_val=Self::get_val(&node.as_ref().unwrap().left, val_of_none).clone();
+                    let right_val=Self::get_val(&node.as_ref().unwrap().right, val_of_none).clone();
+                    (*operation)(Self::get_mut_val(node), &left_val, &right_val)
+                }
+                let prev_node=std::mem::take(node);
+                prev_left.as_mut().unwrap().right=prev_node;
+                if val_of_none.is_some() {
+                    let left_val=Self::get_val(&prev_left.as_ref().unwrap().left, val_of_none).clone();
+                    let right_val=Self::get_val(&prev_left.as_ref().unwrap().right, val_of_none).clone();
+                    (*operation)(Self::get_mut_val(&mut prev_left), &left_val, &right_val)
+                }
+                *node=prev_left;
+            }
+        }
+    }
+    /// 左回転を行う関数
+    fn rotate_left(node: &mut AANode<K,V>, operation: &mut Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: &Option<V>) {
+        if node.is_some() {
+            if node.as_ref().unwrap().right.is_some() {
+                let mut prev_right=std::mem::take(&mut node.as_mut().unwrap().right);
+                let prev_right_left=std::mem::take(&mut prev_right.as_mut().unwrap().left);
+                node.as_mut().unwrap().right=prev_right_left;
+                if val_of_none.is_some() {
+                    let left_val=Self::get_val(&node.as_ref().unwrap().left, val_of_none).clone();
+                    let right_val=Self::get_val(&node.as_ref().unwrap().right, val_of_none).clone();
+                    (*operation)(Self::get_mut_val(node), &left_val, &right_val)
+                }
+                let prev_node=std::mem::take(node);
+                prev_right.as_mut().unwrap().left=prev_node;
+                if val_of_none.is_some() {
+                    let left_val=Self::get_val(&prev_right.as_ref().unwrap().left, val_of_none).clone();
+                    let right_val=Self::get_val(&prev_right.as_ref().unwrap().right, val_of_none).clone();
+                    (*operation)(Self::get_mut_val(&mut prev_right), &left_val, &right_val)
+                }
+                *node=prev_right;
+            }
+        }
+    }
+    /// 左の子が赤頂点である場合の回転を行う関数
+    fn skew(node: &mut AANode<K,V>, operation: &mut Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: &Option<V>) {
+        if node.is_some() {
+            if node.as_ref().unwrap().level==Self::get_level(&node.as_ref().unwrap().left) {
+                Self::rotate_right(node, operation, val_of_none);
+            }
+        }
+    }
+    /// 右の子の右の子が赤頂点である場合の回転を行う関数
+    fn split(node: &mut AANode<K,V>, operation: &mut Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: &Option<V>) {
+        if node.is_some() {
+            if node.as_ref().unwrap().right.is_some() {
+                if node.as_ref().unwrap().level==Self::get_level(&node.as_ref().unwrap().right.as_ref().unwrap().right) {
+                    Self::rotate_left(node, operation, val_of_none);
+                    if node.is_some() {
+                        node.as_mut().unwrap().level+=1;
+                    }
+                }
+            }
+        }
+    }
+    /// 部分木内の最小値とkeyおよびvalを交換する関数
+    fn swap_key_and_val_with_min_node(node: &mut AANode<K,V>) {
+        let mut node_key=std::mem::take(&mut node.as_mut().unwrap().key);
+        let mut node_val=std::mem::take(&mut node.as_mut().unwrap().val);
+        let mut right_min=&mut node.as_mut().unwrap().right;
+        while right_min.as_ref().unwrap().left.is_some() {
+            right_min=&mut right_min.as_mut().unwrap().left;
+        }
+        std::mem::swap(&mut node_key, &mut right_min.as_mut().unwrap().key);
+        std::mem::swap(&mut node_val, &mut right_min.as_mut().unwrap().val);
+        node.as_mut().unwrap().key=node_key;
+        node.as_mut().unwrap().val=node_val;
+    }
+    /// 再帰的に頂点を挿入する関数（返り値は新たに頂点が追加されたか）
+    fn insert_node(node: &mut AANode<K,V>, operation: &mut Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: &Option<V>, key: &K, val: &V) -> bool {
+        let mut ret=true;
+        if node.is_none() {
+            *node=Some(Box::<NodeOfAATree<K,V>>::new(
+                NodeOfAATree { key: key.clone(), val: val.clone(), level: 1, left: None, right: None }
+            ));
+        } else if *key==node.as_ref().unwrap().key {
+            node.as_mut().unwrap().key=key.clone();
+            node.as_mut().unwrap().val=val.clone();
+            ret=false;
+        } else if *key<node.as_ref().unwrap().key {
+            ret=Self::insert_node(&mut node.as_mut().unwrap().left, operation, val_of_none, key, val);
+        } else {
+            ret=Self::insert_node(&mut node.as_mut().unwrap().right, operation, val_of_none, key, val);
+        }
+        if val_of_none.is_some() {
+            let left_val=Self::get_val(&node.as_ref().unwrap().left, val_of_none).clone();
+            let right_val=Self::get_val(&node.as_ref().unwrap().right, val_of_none).clone();
+            (*operation)(Self::get_mut_val(node), &left_val, &right_val)
+        }
+        Self::skew(node, operation, val_of_none);
+        Self::split(node, operation, val_of_none);
+        ret
+    }
+    /// 再帰的に頂点を削除する関数（返り値は削除される頂点があったか）
+    fn remove_node(node: &mut AANode<K,V>, operation: &mut Box<dyn FnMut(&mut V,&V,&V) -> ()>, val_of_none: &Option<V>, key: &K) -> bool {
+        if node.is_none() {
+            return false;
+        }
+        let mut ret=true;
+        if *key==node.as_ref().unwrap().key {
+            if node.as_ref().unwrap().left.is_none() {
+                let prev_node=std::mem::take(node);
+                *node=prev_node.unwrap().right;
+            } else if node.as_ref().unwrap().right.is_none() {
+                let prev_node=std::mem::take(node);
+                *node=prev_node.unwrap().left;
+            } else {
+                Self::swap_key_and_val_with_min_node(node);
+                Self::remove_node(&mut node.as_mut().unwrap().right, operation, val_of_none, key);
+            }
+        } else if *key<node.as_ref().unwrap().key {
+            if node.as_ref().unwrap().left.is_some() {
+                Self::remove_node(&mut node.as_mut().unwrap().left, operation, val_of_none, key);
+            } else {
+                ret=false;
+            }
+        } else {
+            if node.as_ref().unwrap().right.is_some() {
+                Self::remove_node(&mut node.as_mut().unwrap().right, operation, val_of_none, key);
+            } else {
+                ret=false;
+            }
+        }
+        if ret && node.is_some() && val_of_none.is_some() {
+            let left_val=Self::get_val(&node.as_ref().unwrap().left, val_of_none).clone();
+            let right_val=Self::get_val(&node.as_ref().unwrap().right, val_of_none).clone();
+            (*operation)(Self::get_mut_val(node), &left_val, &right_val)
+        }
+        if node.is_some() && (node.as_ref().unwrap().level>Self::get_level(&node.as_ref().unwrap().left)+1
+        || node.as_ref().unwrap().level>Self::get_level(&node.as_ref().unwrap().right)+1) {
+            node.as_mut().unwrap().level-=1;
+            if node.as_ref().unwrap().level<Self::get_level(&node.as_ref().unwrap().right) {
+                node.as_mut().unwrap().right.as_mut().unwrap().level=node.as_ref().unwrap().level;
+            }
+            Self::skew(node, operation, val_of_none);
+            if node.is_some() {
+                Self::skew(&mut node.as_mut().unwrap().right, operation, val_of_none);
+                if node.as_mut().unwrap().right.is_some() {
+                    Self::skew(&mut node.as_mut().unwrap().right.as_mut().unwrap().right, operation, val_of_none);
+                }
+            }
+            Self::split(node, operation, val_of_none);
+            if node.is_some() {
+                Self::split(&mut node.as_mut().unwrap().right, operation, val_of_none);
+            }
+        }
+        ret
+    }
+    /// 再帰的に頂点を探索し、valを返す関数（返り値はOption）
+    fn search_node(node: &AANode<K,V>, key: &K) -> Option<V> {
+        if let Some(node)=node {
+            if *key==node.key {
+                Some(node.val.clone())
+            } else if *key<node.key {
+                Self::search_node(&node.left, key)
+            } else {
+                Self::search_node(&node.right, key)
+            }
+        } else {
+            None
+        }
+    }
+    /// 頂点を挿入する関数
+    pub fn insert(&mut self, key: &K, val: &V) {
+        if Self::insert_node(&mut self.root, &mut self.operation, &self.val_of_none, key, val) {
+            self.len+=1;
+        }
+    }
+    /// 頂点を削除する関数（返り値は削除される頂点があったか）
+    pub fn remove(&mut self, key: &K) -> bool {
+        if Self::remove_node(&mut self.root, &mut self.operation, &self.val_of_none, key) {
+            self.len-=1;
+            true
+        } else {
+            false
+        }
+    }
+    /// 頂点を探索し、valを返す関数（返り値はOption）
+    pub fn search(&self, key: &K) -> Option<V> {
+        Self::search_node(&self.root, key)
+    }
+    /// 頂点を探索し、存在するかを返す関数
+    pub fn contains(&self, key: &K) -> bool {
+        Self::search_node(&self.root, key).is_some()
+    }
+    /// 根を返す関数（返り値はOption）
+    pub fn get_root(&self) -> Option<AATreePointer<K,V>> {
+        if self.root.is_some() {
+            Some(AATreePointer { pointer: &self.root })
+        } else {
+            None
+        }
+    }
+}
+
+impl<K,V> std::fmt::Debug for AATree<K,V> where K: std::fmt::Debug, V: std::fmt::Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "AATree {{ len: {}, root: {:?} }}", self.len, self.root)
+    }
+}
+
+/// AA木上のある頂点をもつ構造体
+#[derive(Clone, Debug)]
+pub struct AATreePointer<'a,K,V> {
+    pointer: &'a AANode<K,V>
+}
+
+impl<'a,K,V> AATreePointer<'a,K,V> where K: Clone + Default + Eq + Ord, V: Clone + Default {
+    /// 頂点のkeyの参照を返す関数
+    pub fn get_key(&self) -> &K {
+        AATree::get_key(&self.pointer)
+    }
+    /// 頂点のvalの参照を返す関数
+    pub fn get_val(&self) -> &V {
+        AATree::get_val(&self.pointer, &None)
+    }
+    /// 左の子のkeyを返す関数（返り値は参照のOption）
+    pub fn get_left_key(&self) -> Option<&K> {
+        let left=&self.pointer.as_ref().unwrap().left;
+        if left.is_some() {
+            Some(&AATree::get_key(left))
+        } else {
+            None
+        }
+    }
+    /// 右の子のkeyを返す関数（返り値は参照のOption）
+    pub fn get_right_key(&self) -> Option<&K> {
+        let right=&self.pointer.as_ref().unwrap().right;
+        if right.is_some() {
+            Some(&AATree::get_key(right))
+        } else {
+            None
+        }
+    }
+    /// 頂点を左の子にする関数（返り値は左の子があったか）
+    pub fn set_left(&mut self) -> bool {
+        if self.pointer.as_ref().unwrap().left.is_some() {
+            self.pointer=&self.pointer.as_ref().unwrap().left;
+            true
+        } else {
+            false
+        }
+    }
+    /// 頂点を右の子にする関数（返り値は右の子があったか）
+    pub fn set_right(&mut self) -> bool {
+        let right=&self.pointer.as_ref().unwrap().right;
+        if right.is_some() {
+            self.pointer=right;
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// 動的セグ木の構造体（関数名はac-library-rsに準拠）
+pub struct DynamicSegtree<T,M> where T: Default + std::fmt::Debug + num::PrimInt, M: ac_library::Monoid, M::S: Clone + Default + std::fmt::Debug {
+    tree: AATree<T,(M::S,M::S)>
+}
+
+impl<T,M> DynamicSegtree<T,M> where T: Default + std::fmt::Debug + num::PrimInt, M: ac_library::Monoid, M::S: Clone + Default + std::fmt::Debug {
+    pub fn new() -> Self {
+        DynamicSegtree { tree: AATree::new_operation(Box::new(|(mv,ms):&mut (M::S,M::S),(_,ls):&(M::S,M::S),(_,rs):&(M::S,M::S)| {
+            *ms=M::binary_operation(&M::binary_operation(&ls, &mv), &rs);
+        }), (M::identity(),M::identity())) }
+    }
+    /// セグ木の現在の要素数を返す関数
+    pub fn len(&self) -> usize {
+        self.tree.len()
+    }
+    pub fn set(&mut self, key: T, val: &M::S) {
+        self.tree.insert(&key, &(val.clone(),val.clone()));
+    }
+    /// 指定したkeyの値をセグ木から消す関数
+    pub fn unset(&mut self, key: T) {
+        self.tree.remove(&key);
+    }
+    pub fn get(&self, key: T) -> Option<M::S> {
+        if let Some((val,_))=self.tree.search(&key) {
+            Some(val.clone())
+        } else {
+            None
+        }
+    }
+    /// 指定したkeyの値が存在するかを返す関数
+    pub fn contains(&self, key: T) -> bool {
+        self.tree.contains(&key)
+    }
+    pub fn prod<R>(&self, range: R) -> M::S where R: std::ops::RangeBounds<T> {
+        if let Some(mut pointer)=self.tree.get_root() {
+            if std::ops::RangeBounds::start_bound(&range)==std::ops::Bound::Unbounded && std::ops::RangeBounds::end_bound(&range)==std::ops::Bound::Unbounded {
+                return pointer.get_val().1.clone();
+            }
+            let l=match std::ops::RangeBounds::start_bound(&range) {
+                std::ops::Bound::Unbounded => None,
+                std::ops::Bound::Included(l) => Some(*l),
+                std::ops::Bound::Excluded(l) => Some(*l+T::one())
+            };
+            let r=match std::ops::RangeBounds::end_bound(&range) {
+                std::ops::Bound::Unbounded => None,
+                std::ops::Bound::Included(r) => Some(*r),
+                std::ops::Bound::Excluded(r) => Some(*r-T::one())
+            };
+            loop {
+                let mut has_left=false;
+                let mut has_right=false;
+                if (l.is_none() || l.unwrap()<*pointer.get_key()) && (r.is_some() && r.unwrap()<*pointer.get_key()) {
+                    has_left=pointer.set_left();
+                } else if (l.is_some() && l.unwrap()>*pointer.get_key()) && (r.is_none() || r.unwrap()>*pointer.get_key()) {
+                    has_right=pointer.set_right();
+                } else {
+                    break;
+                }
+                if !has_left && !has_right {
+                    return M::identity();
+                }
+            }
+            let mut ans=pointer.get_val().0.clone();
+            let mut l_pointer=pointer.clone();
+            let mut r_pointer=pointer;
+            if l_pointer.set_left() {
+                if let Some(l)=l {
+                    loop {
+                        let mut has_left=false;
+                        let mut has_right=false;
+                        if l<*l_pointer.get_key() {
+                            let tmp=if l_pointer.get_right_key().is_some() {
+                                let mut right=l_pointer.clone();
+                                right.set_right();
+                                M::binary_operation(&l_pointer.get_val().0, &right.get_val().1)
+                            } else {
+                                l_pointer.get_val().0.clone()
+                            };
+                            ans=M::binary_operation(&tmp, &ans);
+                            has_left=l_pointer.set_left();
+                        } else if l>*l_pointer.get_key() {
+                            has_right=l_pointer.set_right();
+                        } else {
+                            ans=M::binary_operation(&l_pointer.get_val().0, &ans);
+                            break;
+                        }
+                        if !has_left && !has_right {
+                            break;
+                        }
+                    }
+                } else {
+                    ans=M::binary_operation(&l_pointer.get_val().1, &ans);
+                }
+            }
+            if r_pointer.set_right() {
+                if let Some(r)=r {
+                    loop {
+                        let mut has_left=false;
+                        let mut has_right=false;
+                        if r>*r_pointer.get_key() {
+                            let tmp=if r_pointer.get_left_key().is_some() {
+                                let mut left=r_pointer.clone();
+                                left.set_left();
+                                M::binary_operation(&left.get_val().1, &r_pointer.get_val().0)
+                            } else {
+                                r_pointer.get_val().0.clone()
+                            };
+                            ans=M::binary_operation(&ans, &tmp);
+                            has_left=r_pointer.set_right();
+                        } else if r<*r_pointer.get_key() {
+                            has_right=r_pointer.set_left();
+                        } else {
+                            ans=M::binary_operation(&ans, &r_pointer.get_val().0);
+                            break;
+                        }
+                        if !has_left && !has_right {
+                            break;
+                        }
+                    }
+                } else {
+                    ans=M::binary_operation(&ans, &r_pointer.get_val().1);
+                }
+            }
+            ans
+        } else {
+            M::identity()
+        }
+    }
+    pub fn all_prod(&self) -> M::S {
+        if let Some(pointer)=self.tree.get_root() {
+            pointer.get_val().1.clone()
+        } else {
+            M::identity()
+        }
+    }
+}
+
+impl<T,M> std::fmt::Debug for DynamicSegtree<T,M> where T: Default + std::fmt::Debug + num::PrimInt, M: ac_library::Monoid, M::S: Clone + Default + std::fmt::Debug {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "DynamicSegtree {{ tree: {:?} }}", self.tree)
     }
 }
 
