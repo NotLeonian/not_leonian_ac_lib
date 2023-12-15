@@ -3446,6 +3446,170 @@ impl<T> ZetaMobius for Vec<T> where T: Clone + std::ops::Add<Output=T> + std::op
     }
 }
 
+/// 動的Li Chao Treeのノードの構造体
+#[derive(Clone, Default, Debug)]
+struct LiChaoTreeNode {
+    a: isize,
+    b: isize,
+    left: Option<usize>,
+    right: Option<usize>,
+}
+
+/// 動的Li Chao Treeの構造体
+#[derive(Clone, Default, Debug)]
+pub struct LiChaoTree {
+    len: usize,
+    nodes: Vec<LiChaoTreeNode>,
+    is_min_query: bool,
+    min_x: isize,
+    max_x: isize
+}
+
+impl LiChaoTree {
+    /// 初期化の関数（is_min_queryは最小値クエリであるか、min_x、max_xはそれぞれクエリのxがとる閉区間の下端と上端）
+    pub fn new<T>(is_min_query: bool, min_x: T, max_x: T) -> Self where T: num::PrimInt {
+        let min_x=min_x.to_isize().unwrap();
+        let max_x=max_x.to_isize().unwrap();
+        Self { len: 0, nodes: vec![LiChaoTreeNode { a: 0, b: isize::MAX, left: None, right: None }], is_min_query, min_x, max_x }
+    }
+    /// 直線および線分の個数
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    /// f(x)=ax+bの値を返す関数
+    fn f<T>(&self, num: usize, x: T) -> T where T: num::PrimInt {
+        let x=x.to_isize().unwrap();
+        let node=&self.nodes[num];
+        T::from(node.a*x+node.b).unwrap()
+    }
+    /// 再帰的に直線を挿入する関数
+    fn insert_line(&mut self, num_p: Option<usize>, mut a: isize, mut b: isize, l: isize, r: isize, y_l: isize, y_r: isize) -> Option<usize> {
+        if num_p.is_none() {
+            self.nodes.push(LiChaoTreeNode { a, b, left: None, right: None });
+            return Some(self.nodes.len()-1);
+        }
+        let num=num_p.unwrap();
+        let f_l=self.f(num, l);
+        let f_r=self.f(num, r);
+        if f_l>=y_l && f_r>=y_r {
+            self.nodes[num].a=a;
+            self.nodes[num].b=b;
+        } else if !(f_l<=y_l && f_r<=y_r) {
+            let mut m=(l+r)/2;
+            if m==r {
+                m-=1;
+            }
+            let f_m=self.f(num, m);
+            let y_m=a*m+b;
+            if f_m>y_m {
+                std::mem::swap(&mut self.nodes[num].a, &mut a);
+                std::mem::swap(&mut self.nodes[num].b, &mut b);
+                if y_l>=f_l {
+                    self.nodes[num].left=self.insert_line(self.nodes[num].left, a, b, l, m, f_l, f_m);
+                } else {
+                    self.nodes[num].right=self.insert_line(self.nodes[num].right, a, b, m+1, r, f_m+a, f_r);
+                }
+            } else {
+                if f_l>=y_l {
+                    self.nodes[num].left=self.insert_line(self.nodes[num].left, a, b, l, m, y_l, y_m);
+                } else {
+                    self.nodes[num].right=self.insert_line(self.nodes[num].right, a, b, m+1, r, y_m+a, y_r);
+                }
+            }
+        }
+        num_p
+    }
+    /// 再帰的に線分を挿入する関数
+    fn insert_line_segment(&mut self, mut num_p: Option<usize>, a: isize, b: isize, l_end: isize, r_end: isize, l: isize, r: isize, y_l: isize, y_r: isize) -> Option<usize> {
+        if r<l_end || r_end<l {
+            return num_p;
+        }
+        if l_end<=l && r<=r_end {
+            return self.insert_line(num_p, a, b, l, r, y_l, y_r);
+        }
+        if let Some(num)=num_p {
+            let f_l=self.f(num, l);
+            let f_r=self.f(num, r);
+            if f_l<=y_l && f_r<=y_r {
+                return num_p;
+            }
+        } else {
+            self.nodes.push(LiChaoTreeNode { a: 0, b: isize::MAX, left: None, right: None });
+            num_p=Some(self.nodes.len()-1);
+        }
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        let y_m=a*m+b;
+        let num=num_p.unwrap();
+        self.nodes[num].left=self.insert_line_segment(self.nodes[num].left, a, b, l_end, r_end, l, m, y_l, y_m);
+        self.nodes[num].right=self.insert_line_segment(self.nodes[num].right, a, b, l_end, r_end, m+1, r, y_m+a, y_r);
+        num_p
+    }
+    /// 再帰的に最小値または最大値を返す関数
+    fn return_query(&self, num_p: Option<usize>, x:isize, l: isize, r: isize) -> isize {
+        if num_p.is_none() {
+            return isize::MAX;
+        }
+        let num=num_p.unwrap();
+        if l==r {
+            return self.f(num, x);
+        }
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if x<=m {
+            min(self.f(num, x), self.return_query(self.nodes[num].left, x, l, m))
+        } else {
+            min(self.f(num, x), self.return_query(self.nodes[num].right, x, m+1, r))
+        }
+    }
+    /// 直線を挿入する関数
+    pub fn add_line<T>(&mut self, a: T, b: T) where T: num::PrimInt {
+        let a=if self.is_min_query {
+            a.to_isize().unwrap()
+        } else {
+            -(a.to_isize().unwrap())
+        };
+        let b=if self.is_min_query {
+            b.to_isize().unwrap()
+        } else {
+            -(b.to_isize().unwrap())
+        };
+        self.insert_line(Some(0), a, b, self.min_x, self.max_x, a*self.min_x+b, a*self.max_x+b);
+        self.len+=1;
+    }
+    /// 線分を挿入する関数（l,rは線分をとるxの左閉右開区間）
+    pub fn add_line_segment<T1,T2>(&mut self, a: T1, b: T1, l: T2, r: T2) where T1: num::PrimInt, T2: num::PrimInt {
+        let a=if self.is_min_query {
+            a.to_isize().unwrap()
+        } else {
+            -(a.to_isize().unwrap())
+        };
+        let b=if self.is_min_query {
+            b.to_isize().unwrap()
+        } else {
+            -(b.to_isize().unwrap())
+        };
+        let l=l.to_isize().unwrap();
+        let r=r.to_isize().unwrap();
+        self.insert_line_segment(Some(0), a, b, l, r-1, self.min_x, self.max_x, a*self.min_x+b, a*self.max_x+b);
+        self.len+=1;
+    }
+    /// 最小値または最大値を返す関数
+    pub fn query<T>(&self, x: T) -> T where T: num::PrimInt {
+        let x=x.to_isize().unwrap();
+        let ret=self.return_query(Some(0), x, self.min_x, self.max_x);
+        if self.is_min_query {
+            T::from(ret).unwrap()
+        } else {
+            T::from(-ret).unwrap()
+        }
+    }
+}
+
 /// 単一の文字を数値に変換する関数のトレイト
 pub trait FromChar {
     /// 文字を数値に変換する関数（0-indexedの閉区間）
