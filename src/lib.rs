@@ -2016,11 +2016,11 @@ impl<M> QuadraticResidue for ac_library::StaticModInt<M> where M: ac_library::Mo
         self.pow((M::VALUE as u64-1)/2)==Self::new(1)
     }
     fn mod_sqrt(&self) -> Option<Self> {
-        if !self.is_quadratic_residue() {
-            return None;
-        }
         if *self==Self::new(0) || M::VALUE==2 {
             return Some(self.clone());
+        }
+        if !self.is_quadratic_residue() {
+            return None;
         }
         if M::VALUE%4==3 {
             return Some(self.pow((M::VALUE as u64+1)/4));
@@ -3078,6 +3078,8 @@ impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float
 
 /// NTT素数のベクターで形式的冪級数を扱うトレイト（計算によって次数が変わるものはdegで結果の次数を指定）
 pub trait FPS where Self: Sized {
+    /// 対応するSparseFPSの型
+    type Sparse;
     /// 形式的冪級数の最初のlen項を割り当てる関数
     fn fps_prefix_assign(&mut self, len: usize);
     /// 形式的冪級数の最初のlen項を返す関数
@@ -3108,9 +3110,9 @@ pub trait FPS where Self: Sized {
     fn fps_diff_assign(&mut self);
     /// 形式的冪級数の導関数を返す関数
     fn fps_diff(&self) -> Self;
-    /// 形式的冪級数の定積分を割り当てる関数
+    /// 形式的冪級数の原始関数を割り当てる関数
     fn fps_int_assign(&mut self);
-    /// 形式的冪級数の定積分を返す関数
+    /// 形式的冪級数の原始関数を返す関数
     fn fps_int(&self) -> Self;
     /// 形式的冪級数の対数を割り当てる関数
     fn fps_log_assign(&mut self, deg: usize);
@@ -3128,11 +3130,20 @@ pub trait FPS where Self: Sized {
     fn fps_sqrt_assign(&mut self, deg: usize);
     /// 形式的冪級数の平方根を返す関数
     fn fps_sqrt(&self, deg: usize) -> Self;
+    /// 疎な形式的冪級数との積を割り当てる関数
+    fn sparse_fps_mul_assign(&mut self, g: &Self::Sparse, deg: usize);
+    /// 疎な形式的冪級数との積を返す関数
+    fn sparse_fps_mul(f: &Self, g: &Self::Sparse, deg: usize) -> Self;
+    /// 疎な形式的冪級数による商を割り当てる関数
+    fn sparse_fps_div_assign(&mut self, g: &Self::Sparse, deg: usize);
+    /// 疎な形式的冪級数による商を返す関数
+    fn sparse_fps_div(f: &Self, g: &Self::Sparse, deg: usize) -> Self;
     /// 形式的冪級数の配列を受け取ってその総積を計算し、配列を破壊して最初の要素に総積を代入する関数
     fn fps_prod_merge(fs: &mut Vec<Self>);
 }
 
 impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
+    type Sparse = Vec<(usize,ac_library::StaticModInt<M>)>;
     fn fps_prefix_assign(&mut self, len: usize) {
         self.resize(len, ac_library::StaticModInt::<M>::new(0));
     }
@@ -3240,6 +3251,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     }
     fn fps_log(&self, deg: usize) -> Self {
         debug_assert!(self.len()>deg);
+        debug_assert_eq!(self[0], ac_library::StaticModInt::<M>::new(1));
         let mut h=self.clone();
         h.fps_diff_assign();
         h.fps_div_assign(self, deg);
@@ -3276,26 +3288,27 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         debug_assert!((self.len()-1)*k>=deg);
         let n=self.len()-1;
         self.fps_prefix_assign(deg+1);
-        let mut lower=(ac_library::StaticModInt::<M>::new(1),0);
+        let mut lower=(0,ac_library::StaticModInt::<M>::new(1));
         for i in 0..=n {
             if self[i]!=ac_library::StaticModInt::<M>::new(0) {
-                lower=(self[i],i);
+                lower=(i,self[i]);
                 break;
             }
         }
-        for i in 0..=n-lower.1 {
-            self[i]=self[i+lower.1]/lower.0;
+        for i in 0..=n-lower.0 {
+            self[i]=self[i+lower.0]/lower.1;
         }
-        for i in n-lower.1+1..=n {
+        for i in n-lower.0+1..=n {
             self[i]=ac_library::StaticModInt::<M>::new(0);
         }
         self.fps_log_assign(deg);
         self.fps_scalar_assign(k as isize);
         self.fps_exp_assign(deg);
-        for i in (lower.1*k..=deg).rev() {
-            self[i]=self[i-lower.1*k]*lower.0.pow(k as u64);
+        let lpow=lower.1.pow(k as u64);
+        for i in (lower.0*k..=deg).rev() {
+            self[i]=self[i-lower.0*k]*lpow;
         }
-        for i in 0..min(lower.1*k,deg+1) {
+        for i in 0..min(lower.0*k,deg+1) {
             self[i]=ac_library::StaticModInt::<M>::new(0);
         }
     }
@@ -3312,7 +3325,15 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     fn fps_sqrt(&self, deg: usize) -> Self {
         debug_assert!(self.len()>deg);
         let mut sqrt=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
-        sqrt[0]=self[0].mod_sqrt().unwrap();
+        let mut lower=0;
+        for i in 0..=deg {
+            if self[i]!=ac_library::StaticModInt::<M>::new(0) {
+                sqrt[0]=self[i].mod_sqrt().unwrap();
+                lower=i;
+                break;
+            }
+        }
+        debug_assert_eq!(lower%2, 0);
         let mut curlen=1;
         while curlen<=deg {
             curlen*=2;
@@ -3321,12 +3342,61 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
                 g[i]=sqrt[i]*2;
             }
             g=g.fps_inv(min(curlen-1,deg));
-            let h=&ac_library::convolution::convolution(&self[0..min(curlen,deg+1)], &g[0..min(curlen,deg+1)])[curlen/2..min(curlen,deg+1)];
+            let h=&ac_library::convolution::convolution(&self[lower..min(lower+curlen,deg+1)], &g[0..min(curlen,deg+1)])[curlen/2..min(curlen,deg+1)];
             for i in curlen/2..min(curlen,deg+1) {
                 sqrt[i]=h[i-curlen/2];
             }
         }
+        for i in (lower/2..=deg).rev() {
+            sqrt[i]=sqrt[i-lower/2];
+        }
+        for i in 0..min(lower/2,deg+1) {
+            sqrt[i]=ac_library::StaticModInt::<M>::new(0);
+        }
         sqrt
+    }
+    fn sparse_fps_mul_assign(&mut self, g: &Self::Sparse, deg: usize) {
+        self.fps_prefix_assign(deg+1);
+        for i in (0..=deg).rev() {
+            let tmp=self[i];
+            self[i]=ac_library::StaticModInt::<M>::new(0);
+            for &(d,c) in g {
+                if d==0 {
+                    self[i]=self[i]+tmp*c;
+                } else if i>=d {
+                    self[i]=self[i]+self[i-d]*c;
+                }
+            }
+        }
+    }
+    fn sparse_fps_mul(f: &Self, g: &Self::Sparse, deg: usize) -> Self {
+        let mut h=f.clone();
+        h.sparse_fps_mul_assign(g, deg);
+        h
+    }
+    fn sparse_fps_div_assign(&mut self, g: &Self::Sparse, deg: usize) {
+        self.fps_prefix_assign(deg+1);
+        let mut constant=ac_library::StaticModInt::<M>::new(0);
+        for &(d,c) in g {
+            if d==0 {
+                constant=c;
+            }
+        }
+        debug_assert_ne!(constant, ac_library::StaticModInt::<M>::new(0));
+        let cinv=ac_library::StaticModInt::<M>::new(1)/constant;
+        for i in 0..=deg {
+            for &(d,c) in g {
+                if d>0 && i>=d {
+                    self[i]=self[i]-self[i-d]*c;
+                }
+            }
+            self[i]*=cinv;
+        }
+    }
+    fn sparse_fps_div(f: &Self, g: &Self::Sparse, deg: usize) -> Self {
+        let mut h=f.clone();
+        h.sparse_fps_div_assign(g, deg);
+        h
     }
     fn fps_prod_merge(fs: &mut Vec<Self>) {
         let len=fs.len();
@@ -3344,6 +3414,145 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
                 pq.push((l_deg+r_deg,l_i));
             }
         }
+    }
+}
+
+/// 次数とNTT素数の組のベクターで疎な形式的冪級数を扱うトレイト（通常の形式的冪級数への変換ではdegで結果の次数を指定）
+pub trait SparseFPS {
+    /// 対応するFPSの型
+    type Dense;
+    /// 疎な形式的冪級数の逆元を返す関数
+    fn sparse_fps_inv(&self, deg: usize) -> Self::Dense;
+    /// 疎な形式的冪級数の導関数を割り当てる関数
+    fn sparse_fps_diff_assign(&mut self);
+    /// 疎な形式的冪級数の導関数を返す関数
+    fn sparse_fps_diff(&self) -> Self;
+    /// 疎な形式的冪級数の原始関数を割り当てる関数
+    fn sparse_fps_int_assign(&mut self);
+    /// 疎な形式的冪級数の原始関数を返す関数
+    fn sparse_fps_int(&self) -> Self;
+    /// 疎な形式的冪級数の対数を返す関数
+    fn sparse_fps_log(&self, deg: usize) -> Self::Dense;
+    /// 疎な形式的冪級数の指数を返す関数
+    fn sparse_fps_exp(&self, deg: usize) -> Self::Dense;
+    /// 疎な形式的冪級数の冪を返す関数
+    fn sparse_fps_pow(&self, k: usize, deg: usize) -> Self::Dense;
+    /// 疎な形式的冪級数の平方根を返す関数
+    fn sparse_fps_sqrt(&self, deg: usize) -> Self::Dense;
+}
+
+impl<M> SparseFPS for Vec<(usize,ac_library::StaticModInt<M>)> where M: ac_library::Modulus {
+    type Dense = Vec<ac_library::StaticModInt<M>>;
+    fn sparse_fps_inv(&self, deg: usize) -> Self::Dense {
+        let mut ret=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
+        ret[0]=ac_library::StaticModInt::<M>::new(1);
+        ret.sparse_fps_div_assign(self, deg);
+        ret
+    }
+    fn sparse_fps_diff_assign(&mut self) {
+        self.retain(|&(d,_)| d>0);
+        for (d,c) in self {
+            *c*=*d;
+            *d-=1;
+        }
+    }
+    fn sparse_fps_diff(&self) -> Self {
+        let mut h=self.clone();
+        h.sparse_fps_diff_assign();
+        h
+    }
+    fn sparse_fps_int_assign(&mut self) {
+        for (d,c) in self {
+            *d+=1;
+            *c/=*d;
+        }
+    }
+    fn sparse_fps_int(&self) -> Self {
+        let mut h=self.clone();
+        h.sparse_fps_int_assign();
+        h
+    }
+    fn sparse_fps_log(&self, deg: usize) -> Self::Dense {
+        let mut ret=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
+        for &(d,c) in self {
+            ret[d]=c;
+        }
+        debug_assert_eq!(ret[0], ac_library::StaticModInt::<M>::new(1));
+        ret.fps_diff_assign();
+        ret.sparse_fps_div_assign(self, deg);
+        ret.fps_int_assign();
+        ret
+    }
+    fn sparse_fps_exp(&self, deg: usize) -> Self::Dense {
+        let mut ret=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
+        ret[0]=ac_library::StaticModInt::<M>::new(1);
+        for i in 0..deg {
+            for &(d,c) in self {
+                debug_assert!(d!=0 || c==ac_library::StaticModInt::<M>::new(0));
+                if i+1>=d {
+                    ret[i+1]=ret[i+1]+ret[i+1-d]*c*d;
+                }
+            }
+            ret[i+1]/=i+1;
+        }
+        ret
+    }
+    fn sparse_fps_pow(&self, k: usize, deg: usize) -> Self::Dense {
+        let mut lower=(usize::MAX,ac_library::StaticModInt::<M>::new(1));
+        for &(d,c) in self {
+            if c!=ac_library::StaticModInt::<M>::new(0) && d<=lower.0 {
+                lower=(d,c);
+            }
+        }
+        let mut ret=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
+        ret[0]=ac_library::StaticModInt::<M>::new(1);
+        for i in 0..deg {
+            for &(d,c) in self {
+                let d=d-lower.0;
+                let c=c/lower.1;
+                if d>0 && i+1>=d {
+                    ret[i+1]=ret[i+1]+ret[i+1-d]*c*k*d-ret[i+1-d]*c*(i+1-d);
+                }
+            }
+            ret[i+1]/=i+1;
+        }
+        let lpow=lower.1.pow(k as u64);
+        for i in (lower.0*k..=deg).rev() {
+            ret[i]=ret[i-lower.0*k]*lpow;
+        }
+        for i in 0..min(lower.0*k,deg+1) {
+            ret[i]=ac_library::StaticModInt::<M>::new(0);
+        }
+        ret
+    }
+    fn sparse_fps_sqrt(&self, deg: usize) -> Self::Dense {
+        let mut lower=(usize::MAX,ac_library::StaticModInt::<M>::new(1));
+        for &(d,c) in self {
+            if c!=ac_library::StaticModInt::<M>::new(0) && d<=lower.0 {
+                lower=(d,c);
+            }
+        }
+        let csqrt=lower.1.mod_sqrt().unwrap();
+        debug_assert_eq!(lower.0%2, 0);
+        let mut ret=vec![ac_library::StaticModInt::<M>::new(0);deg+1];
+        ret[0]=ac_library::StaticModInt::<M>::new(1);
+        for i in 0..deg {
+            for &(d,c) in self {
+                let d=d-lower.0;
+                let c=c/lower.1;
+                if d>0 && i+1>=d {
+                    ret[i+1]=ret[i+1]+ret[i+1-d]*c*d/2-ret[i+1-d]*c*(i+1-d);
+                }
+            }
+            ret[i+1]/=i+1;
+        }
+        for i in (lower.0/2..=deg).rev() {
+            ret[i]=ret[i-lower.0/2]*csqrt;
+        }
+        for i in 0..min(lower.0/2,deg+1) {
+            ret[i]=ac_library::StaticModInt::<M>::new(0);
+        }
+        ret
     }
 }
 
