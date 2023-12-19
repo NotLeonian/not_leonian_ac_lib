@@ -525,88 +525,496 @@ macro_rules! do_while {
 /// ModInt998244353を表す型
 pub type Mint=ac_library::ModInt998244353;
 
-/// 2次元ベクターによるグラフの型
-pub type VecGraph=Vec<Vec<(usize,usize)>>;
-/// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
-pub type MapGraph=Vec<std::collections::BTreeMap<usize,usize>>;
+/// ModInt1000000007を表す型
+pub type OldMint=ac_library::ModInt1000000007;
 
-/// グラフについてのトレイト ((usize,usize)の2次元ベクターと(usize,usize)のBTreeMapのベクターについて実装)
-pub trait Graph where Self: Sized {
+/// DFSやBFSのイテレータのもつ型（Vertexが行きであるかどうかと頂点番号、VertexEdgeWeightが頂点番号と隣接する頂点番号とその辺の重み）
+pub enum GraphSearch {
+    Vertex(bool,usize),
+    VertexEdgeWeight(usize,usize,usize)
+}
+
+/// 2次元ベクターによるグラフの構造体
+pub struct VecGraph {
+    graph: Vec<Vec<(usize,usize)>>
+}
+
+impl VecGraph {
     /// グラフを初期化する関数
-    fn new(n: usize) -> Self;
+    pub fn new(n: usize) -> Self {
+        Self { graph: vec![Vec::<(usize,usize)>::new();n] }
+    }
     /// 頂点数を返す関数
-    fn size(&self) -> usize;
-    /// 辺を追加する関数
-    fn push(&mut self, a: usize, b: usize, w: usize);
+    pub fn size(&self) -> usize {
+        self.graph.len()
+    }
+    /// 隣接リストの参照を返す関数
+    pub fn get(&self) -> &Vec<Vec<(usize,usize)>> {
+        &self.graph
+    }
+    /// 隣接リストの可変参照を返す関数
+    pub fn get_mut(&mut self) -> &mut Vec<Vec<(usize,usize)>> {
+        &mut self.graph
+    }
     /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
+    pub fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
-        let mut g: Self=Graph::new(n);
+        let mut g=VecGraph::new(n);
         for &(a,b) in ab {
-            g.push(a, b, 1);
-            g.push(b, a, 1);
+            g.graph[a].push((b, 1));
+            g.graph[b].push((a, 1));
         }
         g
     }
     /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
+    pub fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
-        let mut g: Self=Graph::new(n);
+        let mut g=VecGraph::new(n);
         for &(a,b) in ab {
-            g.push(a, b, 1);
+            g.graph[a].push((b, 1));
         }
         g
     }
     /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
+    pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
-        let mut g: Self=Graph::new(n);
+        let mut g=VecGraph::new(n);
         for &(a,b,w) in abw {
-            g.push(a, b, w);
-            g.push(b, a, w);
+            g.graph[a].push((b, w));
+            g.graph[b].push((a, w));
         }
         g
     }
     /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-    fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
+    pub fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
-        let mut g: Self=Graph::new(n);
+        let mut g=VecGraph::new(n);
         for &(a,b,w) in abw {
-            g.push(a, b, w);
+            g.graph[a].push((b, w));
         }
         g
     }
-    /// 頂点aから頂点bへの辺があるかどうかを判定し、辺があれば重みを返す関数（返り値はOption）（VecGraphの場合の使用は非推奨）
-    fn weight(&self, a: usize, b: usize) -> Option<usize>;
+    /// DFSのイテレータを返す関数
+    pub fn dfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        debug_assert!(start<self.size());
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut stack=Vec::<usize>::new();
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some(&(u,w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u);
+                        return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                    }
+                }
+                if let Some(v)=stack.pop() {
+                    vertex=v;
+                    it=self.graph[v].iter();
+                    Some(GraphSearch::Vertex(true, v))
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// 全ての辺を通るDFSのイテレータを返す関数
+    pub fn dfs_all_edges(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        debug_assert!(start<self.size());
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut stack=Vec::<usize>::new();
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some(&(u,w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u);
+                    }
+                    return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                }
+                if let Some(v)=stack.pop() {
+                    vertex=v;
+                    it=self.graph[v].iter();
+                    Some(GraphSearch::Vertex(true, v))
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// 帰りにも頂点を訪れるDFSのイテレータを返す関数
+    pub fn dfs_postorder(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut stack=vec![start+self.size()];
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some(&(u,w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+self.size());
+                        stack.push(u);
+                        return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                    }
+                }
+                if let Some(v)=stack.pop() {
+                    if v<self.size() {
+                        vertex=v;
+                        it=self.graph[v].iter();
+                        Some(GraphSearch::Vertex(true, v))
+                    } else {
+                        Some(GraphSearch::Vertex(false, v-self.size()))
+                    }
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// BFSのイテレータを返す関数
+    pub fn bfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        debug_assert!(start<self.size());
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut queue=std::collections::VecDeque::<usize>::new();
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some(&(u,w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        queue.push_front(u);
+                        return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                    }
+                }
+                if let Some(v)=queue.pop_back() {
+                    vertex=v;
+                    it=self.graph[v].iter();
+                    Some(GraphSearch::Vertex(true, v))
+                } else {
+                    None
+                }
+            }
+        })
+    }
     /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）（到達不能ならばusize::MAXが入る）
-    fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize>;
+    pub fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
+        let mut dist=vec![usize::MAX;self.size()];
+        dist[start]=0;
+        if is_weighted {
+            let mut pq=RevBinaryHeap::<(usize,usize)>::new();
+            pq.push((dist[start],start));
+            while let Some((d,v))=pq.pop() {
+                if dist[v]<d {
+                    continue;
+                }
+                for &(u,w) in &self.graph[v] {
+                    if dist[v]+w<dist[u] {
+                        dist[u]=dist[v]+w;
+                        pq.push((dist[u],u));
+                    }
+                }
+            }
+        } else {
+            let mut seen=vec![false;self.size()];
+            seen[0]=true;
+            let mut queue=std::collections::VecDeque::<usize>::new();
+            queue.push_back(0);
+            while let Some(v)=queue.pop_front() {
+                for &(u,w) in &self.graph[v] {
+                    debug_assert_eq!(w, 1);
+                    if !seen[u] {
+                        dist[u]=dist[v]+w;
+                        seen[u]=true;
+                        queue.push_back(u);
+                    }
+                }
+            }
+        }
+        dist
+    }
     /// グラフからUnion-Find木を構築する関数（0-indexed）
-    fn construct_union_find(&self) -> ac_library::Dsu;
+    pub fn construct_union_find(&self) -> ac_library::Dsu {
+        let mut uf=ac_library::Dsu::new(self.size());
+        for v in 0..self.size() {
+            for &(u,_) in &self.graph[v] {
+                uf.merge(v, u);
+            }
+        }
+        uf
+    }
     /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値はOption）
-    fn is_bipartite_graph(&self) -> Option<Vec<bool>>;
+    pub fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
+        let mut ts=ac_library::TwoSat::new(self.size());
+        for v in 0..self.size() {
+            for &(u,_) in &self.graph[v] {
+                ts.add_clause(v, true, u, true);
+                ts.add_clause(v, false, u, false);
+            }
+        }
+        if ts.satisfiable() {
+            Some(ts.answer().to_vec())
+        } else {
+            None
+        }
+    }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
-    fn pruefer_code(&self) -> Vec<usize>;
+    pub fn pruefer_code(&self) -> Vec<usize> {
+        let n=self.size();
+        let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
+        let mut d=vec![0;n];
+        for v in 0..n {
+            for &(u,_) in &self.graph[v] {
+                adjacency_list[v].insert(u);
+                d[v]+=1;
+            }
+        }
+        let mut leaves=RevBinaryHeap::<usize>::new();
+        for v in 0..n {
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let mut pc=vec![0;n-2];
+        for i in 0..n-2 {
+            let v=leaves.pop().unwrap();
+            let u=adjacency_list[v].pop_first().unwrap();
+            pc[i]=u;
+            adjacency_list[u].remove(&v);
+            d[v]-=1;
+            d[u]-=1;
+            if d[u]==1 {
+                leaves.push(u);
+            }
+        }
+        pc
+    }
 }
 
-impl Graph for VecGraph {
-    fn new(n: usize) -> Self {
-        vec![Vec::<(usize,usize)>::new();n]
+/// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
+pub struct MapGraph {
+    graph: Vec<std::collections::BTreeMap<usize,usize>>
+}
+
+impl MapGraph {
+    /// グラフを初期化する関数
+    pub fn new(n: usize) -> Self {
+        Self { graph: vec![std::collections::BTreeMap::<usize,usize>::new();n] }
     }
-    fn size(&self) -> usize {
-        self.len()
+    /// 頂点数を返す関数
+    pub fn size(&self) -> usize {
+        self.graph.len()
     }
-    fn push(&mut self, a: usize, b: usize, w: usize) {
-        self[a].push((b,w));
+    /// 隣接リストの参照を返す関数
+    pub fn get(&self) -> &Vec<std::collections::BTreeMap<usize,usize>> {
+        &self.graph
     }
-    fn weight(&self, a: usize, b: usize) -> Option<usize> {
-        for &(u,w) in &self[a] {
+    /// 隣接リストの可変参照を返す関数
+    pub fn get_mut(&mut self) -> &mut Vec<std::collections::BTreeMap<usize,usize>> {
+        &mut self.graph
+    }
+    /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+    pub fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
+        debug_assert_eq!(ab.len(), m);
+        let mut g=MapGraph::new(n);
+        for &(a,b) in ab {
+            g.graph[a].insert(b, 1);
+            g.graph[b].insert(a, 1);
+        }
+        g
+    }
+    /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+    pub fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
+        debug_assert_eq!(ab.len(), m);
+        let mut g=MapGraph::new(n);
+        for &(a,b) in ab {
+            g.graph[a].insert(b, 1);
+        }
+        g
+    }
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
+        debug_assert_eq!(abw.len(), m);
+        let mut g=MapGraph::new(n);
+        for &(a,b,w) in abw {
+            g.graph[a].insert(b, w);
+            g.graph[b].insert(a, w);
+        }
+        g
+    }
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    pub fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
+        debug_assert_eq!(abw.len(), m);
+        let mut g=MapGraph::new(n);
+        for &(a,b,w) in abw {
+            g.graph[a].insert(b, w);
+        }
+        g
+    }
+    /// DFSのイテレータを返す関数
+    pub fn dfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        debug_assert!(start<self.size());
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut stack=Vec::<usize>::new();
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some((&u,&w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u);
+                        return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                    }
+                }
+                if let Some(v)=stack.pop() {
+                    vertex=v;
+                    it=self.graph[v].iter();
+                    Some(GraphSearch::Vertex(true, v))
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// 全ての辺を通るDFSのイテレータを返す関数
+    pub fn dfs_all_edges(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        debug_assert!(start<self.size());
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut stack=Vec::<usize>::new();
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some((&u,&w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u);
+                    }
+                    return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                }
+                if let Some(v)=stack.pop() {
+                    vertex=v;
+                    it=self.graph[v].iter();
+                    Some(GraphSearch::Vertex(true, v))
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// 帰りにも頂点を訪れるDFSのイテレータを返す関数
+    pub fn dfs_postorder(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut stack=vec![start+self.size()];
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some((&u,&w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+self.size());
+                        stack.push(u);
+                        return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                    }
+                }
+                if let Some(v)=stack.pop() {
+                    if v<self.size() {
+                        vertex=v;
+                        it=self.graph[v].iter();
+                        Some(GraphSearch::Vertex(true, v))
+                    } else {
+                        Some(GraphSearch::Vertex(false, v-self.size()))
+                    }
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// BFSのイテレータを返す関数
+    pub fn bfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
+        debug_assert!(start<self.size());
+        let mut seen=vec![false;self.size()];
+        seen[start]=true;
+        let mut queue=std::collections::VecDeque::<usize>::new();
+        let mut vertex=start;
+        let mut it=self.graph[start].iter();
+        let mut first=true;
+        std::iter::from_fn(move || {
+            if first {
+                first=false;
+                Some(GraphSearch::Vertex(true, start))
+            } else {
+                while let Some((&u,&w))=it.next() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        queue.push_front(u);
+                        return Some(GraphSearch::VertexEdgeWeight(vertex, u, w));
+                    }
+                }
+                if let Some(v)=queue.pop_back() {
+                    vertex=v;
+                    it=self.graph[v].iter();
+                    Some(GraphSearch::Vertex(true, v))
+                } else {
+                    None
+                }
+            }
+        })
+    }
+    /// 頂点aから頂点bへの辺があるかどうかを判定し、辺があれば重みを返す関数（返り値はOption）
+    pub fn weight(&self, a: usize, b: usize) -> Option<usize> {
+        for (&u,&w) in &self.graph[a] {
             if u==b {
                 return Some(w);
             }
         }
         None
     }
-    fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
+    /// 最短経路の距離を返す関数（is_weightedがtrueでダイクストラ法、falseでBFS）（到達不能ならばusize::MAXが入る）
+    pub fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
         let mut dist=vec![usize::MAX;self.size()];
         dist[start]=0;
         if is_weighted {
@@ -616,7 +1024,7 @@ impl Graph for VecGraph {
                 if dist[v]<d {
                     continue;
                 }
-                for &(u,w) in &self[v] {
+                for (&u,&w) in &self.graph[v] {
                     if dist[v]+w<dist[u] {
                         dist[u]=dist[v]+w;
                         pq.push((dist[u],u));
@@ -629,7 +1037,7 @@ impl Graph for VecGraph {
             let mut queue=std::collections::VecDeque::<usize>::new();
             queue.push_back(0);
             while let Some(v)=queue.pop_front() {
-                for &(u,w) in &self[v] {
+                for (&u,&w) in &self.graph[v] {
                     debug_assert_eq!(w, 1);
                     if !seen[u] {
                         dist[u]=dist[v]+w;
@@ -641,19 +1049,21 @@ impl Graph for VecGraph {
         }
         dist
     }
-    fn construct_union_find(&self) -> ac_library::Dsu {
+    /// グラフからUnion-Find木を構築する関数（0-indexed）
+    pub fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
         for v in 0..self.size() {
-            for &(u,_) in &self[v] {
+            for (&u,_) in &self.graph[v] {
                 uf.merge(v, u);
             }
         }
         uf
     }
-    fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
+    /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値はOption）
+    pub fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
         let mut ts=ac_library::TwoSat::new(self.size());
         for v in 0..self.size() {
-            for &(u,_) in &self[v] {
+            for (&u,_) in &self.graph[v] {
                 ts.add_clause(v, true, u, true);
                 ts.add_clause(v, false, u, false);
             }
@@ -664,12 +1074,13 @@ impl Graph for VecGraph {
             None
         }
     }
-    fn pruefer_code(&self) -> Vec<usize> {
+    /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
+    pub fn pruefer_code(&self) -> Vec<usize> {
         let n=self.size();
         let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
         let mut d=vec![0;n];
         for v in 0..n {
-            for &(u,_) in &self[v] {
+            for (&u,_) in &self.graph[v] {
                 adjacency_list[v].insert(u);
                 d[v]+=1;
             }
@@ -694,133 +1105,6 @@ impl Graph for VecGraph {
         }
         pc
     }
-}
-
-impl Graph for MapGraph {
-    fn new(n: usize) -> Self {
-        vec![std::collections::BTreeMap::<usize,usize>::new();n]
-    }
-    fn size(&self) -> usize {
-        self.len()
-    }
-    fn push(&mut self, a: usize, b: usize, w: usize) {
-        self[a].insert(b,w);
-    }
-    fn weight(&self, a: usize, b: usize) -> Option<usize> {
-        if self[a].contains_key(&b) {
-            Some(self[a][&b])
-        } else {
-            None
-        }
-    }
-    fn dist_of_shortest_paths(&self, start: usize, is_weighted: bool) -> Vec<usize> {
-        let mut dist=vec![usize::MAX;self.size()];
-        dist[start]=0;
-        if is_weighted {
-            let mut pq=RevBinaryHeap::<(usize,usize)>::new();
-            pq.push((dist[start],start));
-            while let Some((d,v))=pq.pop() {
-                if dist[v]<d {
-                    continue;
-                }
-                for (&u,&w) in &self[v] {
-                    if dist[v]+w<dist[u] {
-                        dist[u]=dist[v]+w;
-                        pq.push((dist[u],u));
-                    }
-                }
-            }
-        } else {
-            let mut seen=vec![false;self.size()];
-            seen[0]=true;
-            let mut queue=std::collections::VecDeque::<usize>::new();
-            queue.push_back(0);
-            while let Some(v)=queue.pop_front() {
-                for (&u,&w) in &self[v] {
-                    debug_assert_eq!(w, 1);
-                    if !seen[u] {
-                        dist[u]=dist[v]+w;
-                        seen[u]=true;
-                        queue.push_back(u);
-                    }
-                }
-            }
-        }
-        dist
-    }
-    fn construct_union_find(&self) -> ac_library::Dsu {
-        let mut uf=ac_library::Dsu::new(self.size());
-        for v in 0..self.size() {
-            for (&u,_) in &self[v] {
-                uf.merge(v, u);
-            }
-        }
-        uf
-    }
-    fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
-        let mut ts=ac_library::TwoSat::new(self.size());
-        for v in 0..self.size() {
-            for (&u,_) in &self[v] {
-                ts.add_clause(v, true, u, true);
-                ts.add_clause(v, false, u, false);
-            }
-        }
-        if ts.satisfiable() {
-            Some(ts.answer().to_vec())
-        } else {
-            None
-        }
-    }
-    fn pruefer_code(&self) -> Vec<usize> {
-        let n=self.size();
-        let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
-        let mut d=vec![0;n];
-        for v in 0..n {
-            for (&u,_) in &self[v] {
-                adjacency_list[v].insert(u);
-                d[v]+=1;
-            }
-        }
-        let mut leaves=RevBinaryHeap::<usize>::new();
-        for v in 0..n {
-            if d[v]==1 {
-                leaves.push(v);
-            }
-        }
-        let mut pc=vec![0;n-2];
-        for i in 0..n-2 {
-            let v=leaves.pop().unwrap();
-            let u=adjacency_list[v].pop_first().unwrap();
-            pc[i]=u;
-            adjacency_list[u].remove(&v);
-            d[v]-=1;
-            d[u]-=1;
-            if d[u]==1 {
-                leaves.push(u);
-            }
-        }
-        pc
-    }
-}
-
-/// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-pub fn construct_graph<G>(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> G where G: Graph {
-    G::construct_graph(n, m, ab)
-}
-
-/// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
-pub fn construct_directed_graph<G>(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> G where G: Graph {
-    G::construct_directed_graph(n, m, ab)
-}
-
-/// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-pub fn construct_weighted_graph<G>(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> G where G: Graph {
-    G::construct_weighted_graph(n, m, abw)
-}
-
-/// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
-pub fn construct_weighted_directed_graph<G>(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> G where G: Graph {
-    G::construct_weighted_directed_graph(n, m, abw)
 }
 
 /// 二分探索の関数（整数）
@@ -1145,11 +1429,6 @@ impl<I> ModIntInv for ac_library::DynamicModInt<I> where I: ac_library::Id {
     }
 }
 
-/// ModIntの逆元をベクターで列挙する関数（最初の要素には0が入る）
-pub fn construct_modint_inverses<M>(nmax: usize) -> Vec<M> where M: ModIntInv {
-    ModIntInv::construct_modint_inverses(nmax)
-}
-
 /// ModIntの階乗についてのトレイト
 pub trait ModIntFact where Self: Sized {
     /// ModIntの階乗をベクターで列挙する関数
@@ -1192,16 +1471,6 @@ impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
         }
         factinvs
     }
-}
-
-/// ModIntの階乗をベクターで列挙する関数
-pub fn construct_modint_facts<M>(nmax: usize) -> Vec<M> where M: ModIntFact {
-    M::construct_modint_facts(nmax)
-}
-
-/// ModIntの階乗の逆元をベクターで列挙する関数
-pub fn construct_modint_fact_inverses<M>(nmax: usize, invs: &Vec<M>) -> Vec<M> where M: ModIntFact {
-    M::construct_modint_fact_inverses(nmax, invs)
 }
 
 /// 累積和についてのトレイト
@@ -3558,12 +3827,14 @@ impl<M> SparseFPS for Vec<(usize,ac_library::StaticModInt<M>)> where M: ac_libra
 
 /// プリューファーコードのトレイト
 pub trait PrueferCode {
-    /// プリューファーコードの表すラベルつき木を返す関数（0-indexed）
-    fn labeled_tree<G>(&self) -> G where G: Graph;
+    /// プリューファーコードの表すラベルつき木のVecGraphを返す関数（0-indexed）
+    fn labeled_tree_vec(&self) -> VecGraph;
+    /// プリューファーコードの表すラベルつき木のMapGraphを返す関数（0-indexed）
+    fn labeled_tree_map(&self) -> MapGraph;
 }
 
 impl PrueferCode for Vec<usize> {
-    fn labeled_tree<G>(&self) -> G where G: Graph {
+    fn labeled_tree_vec(&self) -> VecGraph {
         let n=self.len()+2;
         let mut d=vec![1;n];
         let mut leaves=RevBinaryHeap::<usize>::new();
@@ -3588,7 +3859,34 @@ impl PrueferCode for Vec<usize> {
         let v=leaves.pop().unwrap();
         let u=leaves.pop().unwrap();
         ab.push((v,u));
-        construct_graph(n, n-1, &ab)
+        VecGraph::construct_graph(n, n-1, &ab)
+    }
+    fn labeled_tree_map(&self) -> MapGraph {
+        let n=self.len()+2;
+        let mut d=vec![1;n];
+        let mut leaves=RevBinaryHeap::<usize>::new();
+        for &v in self {
+            d[v]+=1;
+        }
+        for v in 0..n {
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let mut ab=Vec::<(usize,usize)>::new();
+        for &v in self {
+            let u=leaves.pop().unwrap();
+            ab.push((v,u));
+            d[v]-=1;
+            d[u]-=1;
+            if d[v]==1 {
+                leaves.push(v);
+            }
+        }
+        let v=leaves.pop().unwrap();
+        let u=leaves.pop().unwrap();
+        ab.push((v,u));
+        MapGraph::construct_graph(n, n-1, &ab)
     }
 }
 
