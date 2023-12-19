@@ -272,40 +272,6 @@ impl EoutputValOr for usize {
     }
 }
 
-/// usizeにキャストするトレイト
-pub trait Usize {
-    /// usizeにキャストする関数
-    fn usize(self) -> usize;
-}
-
-impl<T> Usize for T where Self: num::PrimInt {
-    fn usize(self) -> usize {
-        self.to_usize().unwrap()
-    }
-}
-
-/// bool型の値をusizeにキャストする関数
-pub fn usize(cond: bool) -> usize {
-    cond as usize
-}
-
-/// isizeにキャストするトレイト
-pub trait Isize {
-    /// isizeにキャストする関数
-    fn isize(self) -> isize;
-}
-
-impl<T> Isize for T where Self: num::PrimInt {
-    fn isize(self) -> isize {
-        self.to_isize().unwrap()
-    }
-}
-
-/// bool型の値をisizeにキャストする関数
-pub fn isize(cond: bool) -> isize {
-    cond as isize
-}
-
 /// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
 pub trait GetFromLast {
     /// 配列やベクターに末尾から数えたインデックスでアクセスする関数（1-indexedであることに注意）
@@ -814,6 +780,108 @@ impl VecGraph {
         }
         uf
     }
+    /// クラスカル法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
+    pub fn kruskal(&self, minimize: bool) -> Self {
+        if minimize {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut uf=ac_library::Dsu::new(self.size());
+            let mut pq=RevBinaryHeap::<(usize,usize,usize)>::new();
+            for v in 0..self.size() {
+                for &(u,w) in &self.graph[v] {
+                    if v<u {
+                        pq.push((w,v,u));
+                    }
+                }
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if !uf.same(v, u) {
+                    ret.get_mut()[v].push((u,w));
+                    ret.get_mut()[u].push((v,w));
+                    edge_cnt+=1;
+                    uf.merge(v, u);
+                }
+            }
+            ret
+        } else {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut uf=ac_library::Dsu::new(self.size());
+            let mut pq=std::collections::BinaryHeap::<(usize,usize,usize)>::new();
+            for v in 0..self.size() {
+                for &(u,w) in &self.graph[v] {
+                    if v<u {
+                        pq.push((w,v,u));
+                    }
+                }
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if !uf.same(v, u) {
+                    ret.get_mut()[v].push((u,w));
+                    ret.get_mut()[u].push((v,w));
+                    edge_cnt+=1;
+                    uf.merge(v, u);
+                }
+            }
+            ret
+        }
+    }
+    /// プリム法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
+    pub fn prim(&self, minimize: bool) -> Self {
+        if minimize {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut pq=RevBinaryHeap::<(usize,usize,usize)>::new();
+            let mut ok=vec![false;self.size()];
+            ok[0]=true;
+            for &(u,w) in &self.graph[0] {
+                pq.push((w,0,u));
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if ok[u] {
+                    continue;
+                }
+                ret.get_mut()[v].push((u,w));
+                ret.get_mut()[u].push((v,w));
+                edge_cnt+=1;
+                ok[u]=true;
+                for &(t,w) in &self.graph[u] {
+                    if !ok[t] {
+                        pq.push((w,u,t));
+                    }
+                }
+            }
+            ret
+        } else {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut pq=std::collections::BinaryHeap::<(usize,usize,usize)>::new();
+            let mut ok=vec![false;self.size()];
+            ok[0]=true;
+            for &(u,w) in &self.graph[0] {
+                pq.push((w,0,u));
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if ok[u] {
+                    continue;
+                }
+                ret.get_mut()[v].push((u,w));
+                ret.get_mut()[u].push((v,w));
+                edge_cnt+=1;
+                ok[u]=true;
+                for &(t,w) in &self.graph[u] {
+                    if !ok[t] {
+                        pq.push((w,u,t));
+                    }
+                }
+            }
+            ret
+        }
+    }
     /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値はOption）
     pub fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
         let mut ts=ac_library::TwoSat::new(self.size());
@@ -1150,6 +1218,108 @@ impl MapGraph {
             }
         }
         uf
+    }
+    /// クラスカル法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
+    pub fn kruskal(&self, minimize: bool) -> Self {
+        if minimize {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut uf=ac_library::Dsu::new(self.size());
+            let mut pq=RevBinaryHeap::<(usize,usize,usize)>::new();
+            for v in 0..self.size() {
+                for (&u,&w) in &self.graph[v] {
+                    if v<u {
+                        pq.push((w,v,u));
+                    }
+                }
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if !uf.same(v, u) {
+                    ret.get_mut()[v].insert(u,w);
+                    ret.get_mut()[u].insert(v,w);
+                    edge_cnt+=1;
+                    uf.merge(v, u);
+                }
+            }
+            ret
+        } else {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut uf=ac_library::Dsu::new(self.size());
+            let mut pq=std::collections::BinaryHeap::<(usize,usize,usize)>::new();
+            for v in 0..self.size() {
+                for (&u,&w) in &self.graph[v] {
+                    if v<u {
+                        pq.push((w,v,u));
+                    }
+                }
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if !uf.same(v, u) {
+                    ret.get_mut()[v].insert(u,w);
+                    ret.get_mut()[u].insert(v,w);
+                    edge_cnt+=1;
+                    uf.merge(v, u);
+                }
+            }
+            ret
+        }
+    }
+    /// プリム法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
+    pub fn prim(&self, minimize: bool) -> Self {
+        if minimize {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut pq=RevBinaryHeap::<(usize,usize,usize)>::new();
+            let mut ok=vec![false;self.size()];
+            ok[0]=true;
+            for (&u,&w) in &self.graph[0] {
+                pq.push((w,0,u));
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if ok[u] {
+                    continue;
+                }
+                ret.get_mut()[v].insert(u,w);
+                ret.get_mut()[u].insert(v,w);
+                edge_cnt+=1;
+                ok[u]=true;
+                for (&t,&w) in &self.graph[u] {
+                    if !ok[t] {
+                        pq.push((w,u,t));
+                    }
+                }
+            }
+            ret
+        } else {
+            let mut ret=Self::new(self.size());
+            let mut edge_cnt=0;
+            let mut pq=std::collections::BinaryHeap::<(usize,usize,usize)>::new();
+            let mut ok=vec![false;self.size()];
+            ok[0]=true;
+            for (&u,&w) in &self.graph[0] {
+                pq.push((w,0,u));
+            }
+            while edge_cnt<self.size()-1 {
+                let (w,v,u)=pq.pop().unwrap();
+                if ok[u] {
+                    continue;
+                }
+                ret.get_mut()[v].insert(u,w);
+                ret.get_mut()[u].insert(v,w);
+                edge_cnt+=1;
+                ok[u]=true;
+                for (&t,&w) in &self.graph[u] {
+                    if !ok[t] {
+                        pq.push((w,u,t));
+                    }
+                }
+            }
+            ret
+        }
     }
     /// グラフが二部グラフであるかを判定し、二部グラフであれば色分けの例を返す関数（返り値はOption）
     pub fn is_bipartite_graph(&self) -> Option<Vec<bool>> {
