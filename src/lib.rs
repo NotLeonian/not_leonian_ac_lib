@@ -535,13 +535,14 @@ pub enum GraphSearch {
 }
 
 /// 2次元ベクターによるグラフの構造体
+#[derive(Clone, Default, Debug)]
 pub struct VecGraph {
     graph: Vec<Vec<(usize,usize)>>
 }
 
 impl VecGraph {
     /// グラフを初期化する関数
-    pub fn new(n: usize) -> Self {
+    fn new(n: usize) -> Self {
         Self { graph: vec![Vec::<(usize,usize)>::new();n] }
     }
     /// 頂点数を返す関数
@@ -596,7 +597,6 @@ impl VecGraph {
     }
     /// DFSのイテレータを返す関数
     pub fn dfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
-        debug_assert!(start<self.size());
         let mut seen=vec![false;self.size()];
         seen[start]=true;
         let mut stack=Vec::<usize>::new();
@@ -627,7 +627,6 @@ impl VecGraph {
     }
     /// 全ての辺を通るDFSのイテレータを返す関数
     pub fn dfs_all_edges(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
-        debug_assert!(start<self.size());
         let mut seen=vec![false;self.size()];
         seen[start]=true;
         let mut stack=Vec::<usize>::new();
@@ -693,7 +692,6 @@ impl VecGraph {
     }
     /// BFSのイテレータを返す関数
     pub fn bfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
-        debug_assert!(start<self.size());
         let mut seen=vec![false;self.size()];
         seen[start]=true;
         let mut queue=std::collections::VecDeque::<usize>::new();
@@ -835,13 +833,14 @@ impl VecGraph {
 }
 
 /// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
+#[derive(Clone, Default, Debug)]
 pub struct MapGraph {
     graph: Vec<std::collections::BTreeMap<usize,usize>>
 }
 
 impl MapGraph {
     /// グラフを初期化する関数
-    pub fn new(n: usize) -> Self {
+    fn new(n: usize) -> Self {
         Self { graph: vec![std::collections::BTreeMap::<usize,usize>::new();n] }
     }
     /// 頂点数を返す関数
@@ -896,7 +895,6 @@ impl MapGraph {
     }
     /// DFSのイテレータを返す関数
     pub fn dfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
-        debug_assert!(start<self.size());
         let mut seen=vec![false;self.size()];
         seen[start]=true;
         let mut stack=Vec::<usize>::new();
@@ -927,7 +925,6 @@ impl MapGraph {
     }
     /// 全ての辺を通るDFSのイテレータを返す関数
     pub fn dfs_all_edges(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
-        debug_assert!(start<self.size());
         let mut seen=vec![false;self.size()];
         seen[start]=true;
         let mut stack=Vec::<usize>::new();
@@ -993,7 +990,6 @@ impl MapGraph {
     }
     /// BFSのイテレータを返す関数
     pub fn bfs(&self, start: usize) -> impl Iterator<Item=GraphSearch> + '_ {
-        debug_assert!(start<self.size());
         let mut seen=vec![false;self.size()];
         seen[start]=true;
         let mut queue=std::collections::VecDeque::<usize>::new();
@@ -1140,6 +1136,133 @@ impl MapGraph {
             }
         }
         pc
+    }
+}
+
+/// 負の重みの辺をもつグラフの構造体
+#[derive(Clone, Default, Debug)]
+pub struct IsizeGraph {
+    graph: Vec<Vec<(usize,isize)>>
+}
+
+impl IsizeGraph {
+    /// グラフを初期化する関数
+    fn new(n: usize) -> Self {
+        Self { graph: vec![Vec::<(usize,isize)>::new();n] }
+    }
+    /// 頂点数を返す関数
+    pub fn size(&self) -> usize {
+        self.graph.len()
+    }
+    /// 隣接リストの参照を返す関数
+    pub fn get(&self) -> &Vec<Vec<(usize,isize)>> {
+        &self.graph
+    }
+    /// 隣接リストの可変参照を返す関数
+    pub fn get_mut(&mut self) -> &mut Vec<Vec<(usize,isize)>> {
+        &mut self.graph
+    }
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
+        debug_assert_eq!(abw.len(), m);
+        let mut g=IsizeGraph::new(n);
+        for &(a,b,w) in abw {
+            g.graph[a].push((b, w));
+            g.graph[b].push((a, w));
+        }
+        g
+    }
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    pub fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
+        debug_assert_eq!(abw.len(), m);
+        let mut g=IsizeGraph::new(n);
+        for &(a,b,w) in abw {
+            g.graph[a].push((b, w));
+        }
+        g
+    }
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から、辺の重みの符号を反転した隣接リストを構築する関数（0-indexed）
+    pub fn construct_inversed_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
+        debug_assert_eq!(abw.len(), m);
+        let mut g=IsizeGraph::new(n);
+        for &(a,b,w) in abw {
+            g.graph[a].push((b, -w));
+            g.graph[b].push((a, -w));
+        }
+        g
+    }
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から、辺の重みの符号を反転した隣接リストを構築する関数（0-indexed）
+    pub fn construct_inversed_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
+        debug_assert_eq!(abw.len(), m);
+        let mut g=IsizeGraph::new(n);
+        for &(a,b,w) in abw {
+            g.graph[a].push((b, -w));
+        }
+        g
+    }
+    /// ベルマン・フォード法を行い、始点から到達できる負の閉路がなければそれぞれの頂点との最短距離を返す関数（返り値はOptionで、到達不能ならばusize::MAXが入る）
+    pub fn rough_bellman_ford(&self, start: usize) -> Option<Vec<isize>> {
+        let mut dist=vec![isize::MAX;self.size()];
+        let mut reached=vec![false;self.size()];
+        dist[start]=0;
+        reached[start]=true;
+        for _ in 0..self.size()-1 {
+            for v in 0..self.size() {
+                for &(u,w) in &self.graph[v] {
+                    if reached[v] {
+                        if dist[v].saturating_add(w)<dist[u] {
+                            dist[u]=dist[v].saturating_add(w);
+                        }
+                        reached[u]=true;
+                    }
+                }
+            }
+        }
+        for v in 0..self.size() {
+            for &(u,w) in &self.graph[v] {
+                if reached[v] {
+                    if dist[v].saturating_add(w)<dist[u] {
+                        return None;
+                    }
+                }
+            }
+        }
+        Some(dist)
+    }
+    /// ベルマン・フォード法を行い、それぞれの頂点との最短距離を返す関数（返り値はOptionのベクターで、到達不能ならばusize::MAXが入り、経路内に負の閉路があればNoneを返す）
+    pub fn bellman_ford(&self, start: usize) -> Vec<Option<isize>> {
+        let mut dist=vec![isize::MAX;self.size()];
+        let mut reached=vec![false;self.size()];
+        dist[start]=0;
+        reached[start]=true;
+        for _ in 0..self.size()-1 {
+            for v in 0..self.size() {
+                for &(u,w) in &self.graph[v] {
+                    if reached[v] {
+                        if dist[v].saturating_add(w)<dist[u] {
+                            dist[u]=dist[v].saturating_add(w);
+                        }
+                        reached[u]=true;
+                    }
+                }
+            }
+        }
+        let mut ret=vec![None;self.size()];
+        for v in 0..self.size() {
+            ret[v]=Some(dist[v]);
+        }
+        for _ in 0..self.size()-1 {
+            for v in 0..self.size() {
+                for &(u,w) in &self.graph[v] {
+                    if reached[v] {
+                        if ret[v].is_none() || dist[v].saturating_add(w)<dist[u] {
+                            ret[u]=None;
+                        }
+                    }
+                }
+            }
+        }
+        ret
     }
 }
 
