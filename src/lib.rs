@@ -542,7 +542,7 @@ pub struct VecGraph {
 
 impl VecGraph {
     /// グラフを初期化する関数
-    fn new(n: usize) -> Self {
+    pub fn new(n: usize) -> Self {
         Self { graph: vec![Vec::<(usize,usize)>::new();n] }
     }
     /// 頂点数を返す関数
@@ -774,6 +774,36 @@ impl VecGraph {
         }
         dist
     }
+    /// グラフに閉路がなければ、頂点をトポロジカルソートした結果を返す関数（返り値はOption）
+    pub fn topological_sort(&self) -> Option<Vec<usize>> {
+        let mut ret=Vec::<usize>::new();
+        let mut indeg=vec![0;self.size()];
+        for v in 0..self.size() {
+            for &(u,_) in &self.graph[v] {
+                indeg[u]+=1;
+            }
+        }
+        let mut queue=std::collections::VecDeque::<usize>::new();
+        for v in 0..self.size() {
+            if indeg[v]==0 {
+                queue.push_front(v);
+            }
+        }
+        while let Some(v)=queue.pop_back() {
+            ret.push(v);
+            for &(u,_) in &self.graph[v] {
+                indeg[u]-=1;
+                if indeg[u]==0 {
+                    queue.push_front(u);
+                }
+            }
+        }
+        if ret.len()==self.size() {
+            Some(ret)
+        } else {
+            None
+        }
+    }
     /// グラフからUnion-Find木を構築する関数（0-indexed）
     pub fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
@@ -840,7 +870,7 @@ pub struct MapGraph {
 
 impl MapGraph {
     /// グラフを初期化する関数
-    fn new(n: usize) -> Self {
+    pub fn new(n: usize) -> Self {
         Self { graph: vec![std::collections::BTreeMap::<usize,usize>::new();n] }
     }
     /// 頂点数を返す関数
@@ -1081,6 +1111,36 @@ impl MapGraph {
         }
         dist
     }
+    /// グラフに閉路がなければ、頂点をトポロジカルソートした結果を返す関数（返り値はOption）
+    pub fn topological_sort(&self) -> Option<Vec<usize>> {
+        let mut ret=Vec::<usize>::new();
+        let mut indeg=vec![0;self.size()];
+        for v in 0..self.size() {
+            for (&u,_) in &self.graph[v] {
+                indeg[u]+=1;
+            }
+        }
+        let mut queue=std::collections::VecDeque::<usize>::new();
+        for v in 0..self.size() {
+            if indeg[v]==0 {
+                queue.push_front(v);
+            }
+        }
+        while let Some(v)=queue.pop_back() {
+            ret.push(v);
+            for (&u,_) in &self.graph[v] {
+                indeg[u]-=1;
+                if indeg[u]==0 {
+                    queue.push_front(u);
+                }
+            }
+        }
+        if ret.len()==self.size() {
+            Some(ret)
+        } else {
+            None
+        }
+    }
     /// グラフからUnion-Find木を構築する関数（0-indexed）
     pub fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
@@ -1147,7 +1207,7 @@ pub struct IsizeGraph {
 
 impl IsizeGraph {
     /// グラフを初期化する関数
-    fn new(n: usize) -> Self {
+    pub fn new(n: usize) -> Self {
         Self { graph: vec![Vec::<(usize,isize)>::new();n] }
     }
     /// 頂点数を返す関数
