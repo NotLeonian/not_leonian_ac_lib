@@ -734,8 +734,8 @@ impl VecGraph {
                     continue;
                 }
                 for &(u,w) in &self.graph[v] {
-                    if dist[v]+w<dist[u] {
-                        dist[u]=dist[v]+w;
+                    if dist[v].saturating_add(w)<dist[u] {
+                        dist[u]=dist[v].saturating_add(w);
                         pq.push((dist[u],u));
                     }
                 }
@@ -749,10 +749,28 @@ impl VecGraph {
                 for &(u,w) in &self.graph[v] {
                     debug_assert_eq!(w, 1);
                     if !seen[u] {
-                        dist[u]=dist[v]+w;
+                        dist[u]=dist[v].saturating_add(w);
                         seen[u]=true;
                         queue.push_back(u);
                     }
+                }
+            }
+        }
+        dist
+    }
+    /// ワーシャル・フロイド法の関数（到達不能ならばusize::MAXが入る）
+    pub fn floyd_warshall(&self) -> Vec<Vec<usize>> {
+        let mut dist=vec![vec![usize::MAX;self.size()];self.size()];
+        for v in 0..self.size() {
+            for &(u,w) in &self.graph[v] {
+                dist[v][u]=w;
+                dist[u][v]=w;
+            }
+        }
+        for m in 0..self.size() {
+            for v in 0..self.size() {
+                for u in 0..self.size() {
+                    dist[v][u]=min(dist[v][m].saturating_add(dist[m][u]), dist[v][u]);
                 }
             }
         }
@@ -1025,8 +1043,8 @@ impl MapGraph {
                     continue;
                 }
                 for (&u,&w) in &self.graph[v] {
-                    if dist[v]+w<dist[u] {
-                        dist[u]=dist[v]+w;
+                    if dist[v].saturating_add(w)<dist[u] {
+                        dist[u]=dist[v].saturating_add(w);
                         pq.push((dist[u],u));
                     }
                 }
@@ -1040,10 +1058,28 @@ impl MapGraph {
                 for (&u,&w) in &self.graph[v] {
                     debug_assert_eq!(w, 1);
                     if !seen[u] {
-                        dist[u]=dist[v]+w;
+                        dist[u]=dist[v].saturating_add(w);
                         seen[u]=true;
                         queue.push_back(u);
                     }
+                }
+            }
+        }
+        dist
+    }
+    /// ワーシャル・フロイド法の関数（到達不能ならばusize::MAXが入る）
+    pub fn floyd_warshall(&self) -> Vec<Vec<usize>> {
+        let mut dist=vec![vec![usize::MAX;self.size()];self.size()];
+        for v in 0..self.size() {
+            for (&u,&w) in &self.graph[v] {
+                dist[v][u]=w;
+                dist[u][v]=w;
+            }
+        }
+        for m in 0..self.size() {
+            for v in 0..self.size() {
+                for u in 0..self.size() {
+                    dist[v][u]=min(dist[v][m].saturating_add(dist[m][u]), dist[v][u]);
                 }
             }
         }
