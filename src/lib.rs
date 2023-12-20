@@ -494,7 +494,7 @@ pub type Mint=ac_library::ModInt998244353;
 /// ModInt1000000007を表す型
 pub type OldMint=ac_library::ModInt1000000007;
 
-/// DFSやBFSのイテレータのもつ型（Vertexが行きであるかどうかと頂点番号、VertexEdgeWeightが頂点番号と隣接する頂点番号とその辺の重み）
+/// DFSやBFSのイテレータのもつ列挙型（Vertexが行きであるかどうかと頂点番号、VertexEdgeWeightが頂点番号と隣接する頂点番号とその辺の重み）
 pub enum GraphSearch {
     Vertex(bool,usize),
     VertexEdgeWeight(usize,usize,usize)
@@ -4178,6 +4178,71 @@ impl<M> SparseFPS for Vec<(usize,ac_library::StaticModInt<M>)> where M: ac_libra
         }
         ret
     }
+}
+
+/// Mo's Algorithmの区間の動き方の列挙型（順にクエリの番号と区間の左端と右端）
+/// （Fallが直接そのクエリに向かう動き方、Lengthenは区間が長くなる動き方、LShortenは区間が短くなる動き方で返される左端は消える点であることに注意）
+pub enum MoS {
+    Fall(usize, usize, usize),
+    RLengthen(Option<usize>, usize, usize),
+    LLengthen(Option<usize>, usize, usize),
+    LShorten(Option<usize>, usize, usize)
+}
+
+/// Mo's Algorithmの関数（返り値はイテレータ）
+pub fn mo_s_algorithm(n: usize, queries: &Vec<(usize,usize)>) -> impl Iterator<Item=MoS> {
+    let sqrt=num_integer::Roots::sqrt(&n);
+    let mut queries=queries.iter().enumerate().map(|(i,&lr)| (i,lr)).collect::<Vec<_>>();
+    queries.sort_by(|&(i1,(l1,r1)),&(i2,(l2,r2))| {
+        if l1/sqrt!=l2/sqrt {
+            (l1/sqrt).cmp(&(l2/sqrt))
+        } else if r1!=r2 {
+            r1.cmp(&r2)
+        } else {
+            i1.cmp(&i2)
+        }
+    });
+    let mut prev_l=n;
+    let mut prev_r=n;
+    let mut cur_ind=0;
+    std::iter::from_fn(move || {
+        if cur_ind==queries.len() {
+            return None;
+        }
+        let (i,(l,r))=queries[cur_ind];
+        if prev_r>r {
+            (prev_l,prev_r)=(l,r);
+            cur_ind+=1;
+            Some(MoS::Fall(i, l, r))
+        } else if prev_r<r {
+            prev_r+=1;
+            let ret_ind=if prev_l==l && prev_r==r {
+                cur_ind+=1;
+                Some(i)
+            } else {
+                None
+            };
+            Some(MoS::RLengthen(ret_ind, prev_l, prev_r))
+        } else if prev_l>l {
+            prev_l-=1;
+            let ret_ind=if prev_l==l && prev_r==r {
+                cur_ind+=1;
+                Some(i)
+            } else {
+                None
+            };
+            Some(MoS::LLengthen(ret_ind, prev_l, prev_r))
+        } else {
+            prev_l+=1;
+            let ret_ind=if prev_l==l && prev_r==r {
+                cur_ind+=1;
+                Some(i)
+            } else {
+                None
+            };
+            Some(MoS::LShorten(ret_ind, prev_l-1, prev_r))
+        }
+    })
 }
 
 /// プリューファーコードのトレイト
