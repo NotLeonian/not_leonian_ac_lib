@@ -782,51 +782,34 @@ impl VecGraph {
     }
     /// クラスカル法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
     pub fn kruskal(&self, minimize: bool) -> Self {
-        if minimize {
-            let mut ret=Self::new(self.size());
-            let mut edge_cnt=0;
-            let mut uf=ac_library::Dsu::new(self.size());
-            let mut pq=RevBinaryHeap::<(usize,usize,usize)>::new();
-            for v in 0..self.size() {
-                for &(u,w) in &self.graph[v] {
-                    if v<u {
-                        pq.push((w,v,u));
-                    }
+        let mut ret=Self::new(self.size());
+        let mut edge_cnt=0;
+        let mut uf=ac_library::Dsu::new(self.size());
+        let mut wvu=Vec::<(usize,usize,usize)>::new();
+        for v in 0..self.size() {
+            for &(u,w) in &self.graph[v] {
+                if v<u {
+                    wvu.push((w,v,u));
                 }
             }
-            while edge_cnt<self.size()-1 {
-                let (w,v,u)=pq.pop().unwrap();
-                if !uf.same(v, u) {
-                    ret.get_mut()[v].push((u,w));
-                    ret.get_mut()[u].push((v,w));
-                    edge_cnt+=1;
-                    uf.merge(v, u);
-                }
-            }
-            ret
-        } else {
-            let mut ret=Self::new(self.size());
-            let mut edge_cnt=0;
-            let mut uf=ac_library::Dsu::new(self.size());
-            let mut pq=std::collections::BinaryHeap::<(usize,usize,usize)>::new();
-            for v in 0..self.size() {
-                for &(u,w) in &self.graph[v] {
-                    if v<u {
-                        pq.push((w,v,u));
-                    }
-                }
-            }
-            while edge_cnt<self.size()-1 {
-                let (w,v,u)=pq.pop().unwrap();
-                if !uf.same(v, u) {
-                    ret.get_mut()[v].push((u,w));
-                    ret.get_mut()[u].push((v,w));
-                    edge_cnt+=1;
-                    uf.merge(v, u);
-                }
-            }
-            ret
         }
+        wvu.sort();
+        if !minimize {
+            wvu.reverse();
+        }
+        for i in 0..wvu.len() {
+            let (w,v,u)=wvu[i];
+            if !uf.same(v, u) {
+                ret.get_mut()[v].push((u,w));
+                ret.get_mut()[u].push((v,w));
+                edge_cnt+=1;
+                uf.merge(v, u);
+            }
+            if edge_cnt>=self.size()-1 {
+                break;
+            }
+        }
+        ret
     }
     /// プリム法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
     pub fn prim(&self, minimize: bool) -> Self {
@@ -1221,51 +1204,34 @@ impl MapGraph {
     }
     /// クラスカル法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
     pub fn kruskal(&self, minimize: bool) -> Self {
-        if minimize {
-            let mut ret=Self::new(self.size());
-            let mut edge_cnt=0;
-            let mut uf=ac_library::Dsu::new(self.size());
-            let mut pq=RevBinaryHeap::<(usize,usize,usize)>::new();
-            for v in 0..self.size() {
-                for (&u,&w) in &self.graph[v] {
-                    if v<u {
-                        pq.push((w,v,u));
-                    }
+        let mut ret=Self::new(self.size());
+        let mut edge_cnt=0;
+        let mut uf=ac_library::Dsu::new(self.size());
+        let mut wvu=Vec::<(usize,usize,usize)>::new();
+        for v in 0..self.size() {
+            for (&u,&w) in &self.graph[v] {
+                if v<u {
+                    wvu.push((w,v,u));
                 }
             }
-            while edge_cnt<self.size()-1 {
-                let (w,v,u)=pq.pop().unwrap();
-                if !uf.same(v, u) {
-                    ret.get_mut()[v].insert(u,w);
-                    ret.get_mut()[u].insert(v,w);
-                    edge_cnt+=1;
-                    uf.merge(v, u);
-                }
-            }
-            ret
-        } else {
-            let mut ret=Self::new(self.size());
-            let mut edge_cnt=0;
-            let mut uf=ac_library::Dsu::new(self.size());
-            let mut pq=std::collections::BinaryHeap::<(usize,usize,usize)>::new();
-            for v in 0..self.size() {
-                for (&u,&w) in &self.graph[v] {
-                    if v<u {
-                        pq.push((w,v,u));
-                    }
-                }
-            }
-            while edge_cnt<self.size()-1 {
-                let (w,v,u)=pq.pop().unwrap();
-                if !uf.same(v, u) {
-                    ret.get_mut()[v].insert(u,w);
-                    ret.get_mut()[u].insert(v,w);
-                    edge_cnt+=1;
-                    uf.merge(v, u);
-                }
-            }
-            ret
         }
+        wvu.sort();
+        if !minimize {
+            wvu.reverse();
+        }
+        for i in 0..wvu.len() {
+            let (w,v,u)=wvu[i];
+            if !uf.same(v, u) {
+                ret.get_mut()[v].insert(u,w);
+                ret.get_mut()[u].insert(v,w);
+                edge_cnt+=1;
+                uf.merge(v, u);
+            }
+            if edge_cnt>=self.size()-1 {
+                break;
+            }
+        }
+        ret
     }
     /// プリム法を行い、全域木を返す関数（minimizeは最小全域木であるか（最大全域木ではないか）どうか）
     pub fn prim(&self, minimize: bool) -> Self {
