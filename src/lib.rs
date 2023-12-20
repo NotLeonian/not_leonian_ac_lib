@@ -4308,6 +4308,163 @@ impl<T> ZetaMobius for Vec<T> where T: Clone + std::ops::Add<Output=T> + std::op
     }
 }
 
+/// 動的セグ木のノードの構造体
+#[derive(Clone, Default, Debug)]
+struct DynamicSegtreeNode<M> where M: ac_library::Monoid {
+    x: M::S,
+    left: Option<usize>,
+    right: Option<usize>,
+}
+
+/// 動的セグ木の構造体
+#[derive(Clone, Default, Debug)]
+pub struct DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
+    nodes: Vec<DynamicSegtreeNode<M>>,
+    min_p: isize,
+    max_p: isize
+}
+
+impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
+    /// 初期化の関数（min_p、max_pはそれぞれクエリの添字がとる閉区間の下端と上端）
+    pub fn new<T>(min_p: T, max_p: T) -> Self where T: num::PrimInt {
+        let min_p=min_p.to_isize().unwrap();
+        let max_p=max_p.to_isize().unwrap();
+        Self { nodes: vec![DynamicSegtreeNode { x: M::identity(), left: None, right: None }], min_p, max_p }
+    }
+    /// 指定されたノードがあればそのxを、なければ単位元を返す関数
+    fn x(&self, node_ind: Option<usize>) -> M::S {
+        if let Some(ind)=node_ind {
+            self.nodes[ind].x.clone()
+        } else {
+            M::identity()
+        }
+    }
+    /// 再帰的に値を追加する関数
+    fn set_x(&mut self, node_ind: Option<usize>, p: isize, x: M::S, l: isize, r: isize) -> Option<usize> {
+        if node_ind.is_none() {
+            if l==r {
+                self.nodes.push(DynamicSegtreeNode { x, left: None, right: None });
+                return Some(self.nodes.len()-1);
+            }
+            let mut m=(l+r)/2;
+            if m==r {
+                m-=1;
+            }
+            if p<=m {
+                let left=self.set_x(None, p, x.clone(), l, m);
+                self.nodes.push(DynamicSegtreeNode { x: x.clone(), left, right: None });
+            } else {
+                let right=self.set_x(None, p, x.clone(), m+1, r);
+                self.nodes.push(DynamicSegtreeNode { x: x.clone(), left: None, right });
+            }
+            return Some(self.nodes.len()-1);
+        }
+        let ind=node_ind.unwrap();
+        if l==r {
+            self.nodes[ind].x=x;
+            return node_ind;
+        }
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if p<=m {
+            self.nodes[ind].left=self.set_x(self.nodes[ind].left, p, x, l, m);
+        } else {
+            self.nodes[ind].right=self.set_x(self.nodes[ind].right, p, x, m+1, r);
+        }
+        self.nodes[ind].x=M::binary_operation(&self.x(self.nodes[ind].left), &self.x(self.nodes[ind].right));
+        node_ind
+    }
+    /// 再帰的に値を返す関数
+    fn get_x(&self, node_ind: Option<usize>, p:isize, l: isize, r: isize) -> M::S {
+        if node_ind.is_none() {
+            return M::identity();
+        }
+        if l==r {
+            return self.x(node_ind).clone();
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if p<=m {
+            self.get_x(self.nodes[ind].left, p, l, m)
+        } else {
+            self.get_x(self.nodes[ind].right, p, m+1, r)
+        }
+    }
+    /// 再帰的に区間のモノイド積を返す関数
+    fn get_prod(&self, node_ind: Option<usize>, x_l: isize, x_r: isize, l: isize, r: isize) -> M::S {
+        if node_ind.is_none() {
+            return M::identity();
+        }
+        if x_l==l && x_r==r {
+            return self.x(node_ind).clone();
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if x_r<=m {
+            self.get_prod(self.nodes[ind].left, x_l, x_r, l, m)
+        } else if x_l>m {
+            self.get_prod(self.nodes[ind].right, x_l, x_r, m+1, r)
+        } else {
+            M::binary_operation(&self.get_prod(self.nodes[ind].left, x_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, x_r, m+1, r))
+        }
+    }
+    /// 値を追加する関数
+    pub fn set<T>(&mut self, p: T, x: M::S) where T: num::PrimInt {
+        let p=p.to_isize().unwrap();
+        debug_assert!(self.min_p<=p && p<=self.max_p);
+        self.set_x(Some(0), p, x, self.min_p, self.max_p);
+    }
+    /// 値を返す関数
+    pub fn get<T>(&self, p: T) -> M::S where T: num::PrimInt {
+        let p=p.to_isize().unwrap();
+        debug_assert!(self.min_p<=p && p<=self.max_p);
+        self.get_x(Some(0), p, self.min_p, self.max_p)
+    }
+    /// 区間のモノイド積を返す関数
+    pub fn prod<T,R>(&self, range: R) -> M::S where T: num::PrimInt, R: std::ops::RangeBounds<T> {
+        if let std::ops::Bound::Excluded(&r)=range.end_bound() {
+            let r=r.to_isize().unwrap();
+            if r==self.min_p {
+                return M::identity();
+            }
+        }
+        if let std::ops::Bound::Excluded(&l)=range.start_bound() {
+            let l=l.to_isize().unwrap();
+            if l==self.max_p {
+                return M::identity();
+            }
+        }
+        let l=match range.start_bound() {
+            std::ops::Bound::Included(&l) => l.to_isize().unwrap(),
+            std::ops::Bound::Excluded(&l) => l.to_isize().unwrap()+1,
+            std::ops::Bound::Unbounded => self.min_p
+        };
+        let r=match range.end_bound() {
+            std::ops::Bound::Included(&r) => r.to_isize().unwrap(),
+            std::ops::Bound::Excluded(&r) => r.to_isize().unwrap()-1,
+            std::ops::Bound::Unbounded => self.max_p
+        };
+        debug_assert!(l<=r && self.min_p<=l && r<=self.max_p);
+        if l==self.min_p && r==self.max_p {
+            self.all_prod()
+        } else {
+            self.get_prod(Some(0), l, r, self.min_p, self.max_p)
+        }
+    }
+    /// 全区間のモノイド積を返す関数
+    pub fn all_prod(&self) -> M::S {
+        self.x(Some(0))
+    }
+}
+
 /// 動的Li Chao Treeのノードの構造体
 #[derive(Clone, Default, Debug)]
 struct LiChaoTreeNode {
@@ -4339,93 +4496,93 @@ impl LiChaoTree {
         self.len
     }
     /// f(x)=ax+bの値を返す関数
-    fn f<T>(&self, num: usize, x: T) -> T where T: num::PrimInt {
+    fn f<T>(&self, ind: usize, x: T) -> T where T: num::PrimInt {
         let x=x.to_isize().unwrap();
-        let node=&self.nodes[num];
+        let node=&self.nodes[ind];
         T::from(node.a*x+node.b).unwrap()
     }
     /// 再帰的に直線を挿入する関数
-    fn insert_line(&mut self, num_p: Option<usize>, mut a: isize, mut b: isize, l: isize, r: isize, y_l: isize, y_r: isize) -> Option<usize> {
-        if num_p.is_none() {
+    fn insert_line(&mut self, node_ind: Option<usize>, mut a: isize, mut b: isize, l: isize, r: isize, y_l: isize, y_r: isize) -> Option<usize> {
+        if node_ind.is_none() {
             self.nodes.push(LiChaoTreeNode { a, b, left: None, right: None });
             return Some(self.nodes.len()-1);
         }
-        let num=num_p.unwrap();
-        let f_l=self.f(num, l);
-        let f_r=self.f(num, r);
+        let ind=node_ind.unwrap();
+        let f_l=self.f(ind, l);
+        let f_r=self.f(ind, r);
         if f_l>=y_l && f_r>=y_r {
-            self.nodes[num].a=a;
-            self.nodes[num].b=b;
+            self.nodes[ind].a=a;
+            self.nodes[ind].b=b;
         } else if !(f_l<=y_l && f_r<=y_r) {
             let mut m=(l+r)/2;
             if m==r {
                 m-=1;
             }
-            let f_m=self.f(num, m);
+            let f_m=self.f(ind, m);
             let y_m=a*m+b;
             if f_m>y_m {
-                std::mem::swap(&mut self.nodes[num].a, &mut a);
-                std::mem::swap(&mut self.nodes[num].b, &mut b);
+                std::mem::swap(&mut self.nodes[ind].a, &mut a);
+                std::mem::swap(&mut self.nodes[ind].b, &mut b);
                 if y_l>=f_l {
-                    self.nodes[num].left=self.insert_line(self.nodes[num].left, a, b, l, m, f_l, f_m);
+                    self.nodes[ind].left=self.insert_line(self.nodes[ind].left, a, b, l, m, f_l, f_m);
                 } else {
-                    self.nodes[num].right=self.insert_line(self.nodes[num].right, a, b, m+1, r, f_m+a, f_r);
+                    self.nodes[ind].right=self.insert_line(self.nodes[ind].right, a, b, m+1, r, f_m+a, f_r);
                 }
             } else {
                 if f_l>=y_l {
-                    self.nodes[num].left=self.insert_line(self.nodes[num].left, a, b, l, m, y_l, y_m);
+                    self.nodes[ind].left=self.insert_line(self.nodes[ind].left, a, b, l, m, y_l, y_m);
                 } else {
-                    self.nodes[num].right=self.insert_line(self.nodes[num].right, a, b, m+1, r, y_m+a, y_r);
+                    self.nodes[ind].right=self.insert_line(self.nodes[ind].right, a, b, m+1, r, y_m+a, y_r);
                 }
             }
         }
-        num_p
+        node_ind
     }
     /// 再帰的に線分を挿入する関数
-    fn insert_line_segment(&mut self, mut num_p: Option<usize>, a: isize, b: isize, l_end: isize, r_end: isize, l: isize, r: isize, y_l: isize, y_r: isize) -> Option<usize> {
+    fn insert_line_segment(&mut self, mut node_ind: Option<usize>, a: isize, b: isize, l_end: isize, r_end: isize, l: isize, r: isize, y_l: isize, y_r: isize) -> Option<usize> {
         if r<l_end || r_end<l {
-            return num_p;
+            return node_ind;
         }
         if l_end<=l && r<=r_end {
-            return self.insert_line(num_p, a, b, l, r, y_l, y_r);
+            return self.insert_line(node_ind, a, b, l, r, y_l, y_r);
         }
-        if let Some(num)=num_p {
-            let f_l=self.f(num, l);
-            let f_r=self.f(num, r);
+        if let Some(ind)=node_ind {
+            let f_l=self.f(ind, l);
+            let f_r=self.f(ind, r);
             if f_l<=y_l && f_r<=y_r {
-                return num_p;
+                return node_ind;
             }
         } else {
             self.nodes.push(LiChaoTreeNode { a: 0, b: isize::MAX, left: None, right: None });
-            num_p=Some(self.nodes.len()-1);
+            node_ind=Some(self.nodes.len()-1);
         }
         let mut m=(l+r)/2;
         if m==r {
             m-=1;
         }
         let y_m=a*m+b;
-        let num=num_p.unwrap();
-        self.nodes[num].left=self.insert_line_segment(self.nodes[num].left, a, b, l_end, r_end, l, m, y_l, y_m);
-        self.nodes[num].right=self.insert_line_segment(self.nodes[num].right, a, b, l_end, r_end, m+1, r, y_m+a, y_r);
-        num_p
+        let ind=node_ind.unwrap();
+        self.nodes[ind].left=self.insert_line_segment(self.nodes[ind].left, a, b, l_end, r_end, l, m, y_l, y_m);
+        self.nodes[ind].right=self.insert_line_segment(self.nodes[ind].right, a, b, l_end, r_end, m+1, r, y_m+a, y_r);
+        node_ind
     }
     /// 再帰的に最小値または最大値を返す関数
-    fn return_query(&self, num_p: Option<usize>, x:isize, l: isize, r: isize) -> isize {
-        if num_p.is_none() {
+    fn return_query(&self, node_ind: Option<usize>, x:isize, l: isize, r: isize) -> isize {
+        if node_ind.is_none() {
             return isize::MAX;
         }
-        let num=num_p.unwrap();
+        let ind=node_ind.unwrap();
         if l==r {
-            return self.f(num, x);
+            return self.f(ind, x);
         }
         let mut m=(l+r)/2;
         if m==r {
             m-=1;
         }
         if x<=m {
-            min(self.f(num, x), self.return_query(self.nodes[num].left, x, l, m))
+            min(self.f(ind, x), self.return_query(self.nodes[ind].left, x, l, m))
         } else {
-            min(self.f(num, x), self.return_query(self.nodes[num].right, x, m+1, r))
+            min(self.f(ind, x), self.return_query(self.nodes[ind].right, x, m+1, r))
         }
     }
     /// 直線を挿入する関数
