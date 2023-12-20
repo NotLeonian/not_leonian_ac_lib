@@ -4339,7 +4339,7 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
             M::identity()
         }
     }
-    /// 再帰的に値を追加する関数
+    /// 再帰的にxを代入する関数
     fn set_x(&mut self, node_ind: Option<usize>, p: isize, x: M::S, l: isize, r: isize) -> Option<usize> {
         if node_ind.is_none() {
             if l==r {
@@ -4376,7 +4376,7 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
         self.nodes[ind].x=M::binary_operation(&self.x(self.nodes[ind].left), &self.x(self.nodes[ind].right));
         node_ind
     }
-    /// 再帰的に値を返す関数
+    /// 再帰的にxを返す関数
     fn get_x(&self, node_ind: Option<usize>, p:isize, l: isize, r: isize) -> M::S {
         if node_ind.is_none() {
             return M::identity();
@@ -4416,13 +4416,17 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
             M::binary_operation(&self.get_prod(self.nodes[ind].left, x_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, x_r, m+1, r))
         }
     }
-    /// 値を追加する関数
+    /// pの位置にxを代入する関数
     pub fn set<T>(&mut self, p: T, x: M::S) where T: num::PrimInt {
         let p=p.to_isize().unwrap();
         debug_assert!(self.min_p<=p && p<=self.max_p);
         self.set_x(Some(0), p, x, self.min_p, self.max_p);
     }
-    /// 値を返す関数
+    /// 単位元を代入することで、実質的にpの位置の値を削除する関数
+    pub fn reset<T>(&mut self, p: T) where T: num::PrimInt {
+        self.set(p, M::identity());
+    }
+    /// pの位置のxを返す関数
     pub fn get<T>(&self, p: T) -> M::S where T: num::PrimInt {
         let p=p.to_isize().unwrap();
         debug_assert!(self.min_p<=p && p<=self.max_p);
