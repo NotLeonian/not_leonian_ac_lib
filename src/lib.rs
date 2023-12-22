@@ -4481,6 +4481,124 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
             M::binary_operation(&self.get_prod(self.nodes[ind].left, x_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, x_r, m+1, r))
         }
     }
+    /// 再帰的に右端からのモノイド積と条件fを満たさない左端を返す関数
+    fn get_right_prod<F>(&self, node_ind: Option<usize>, left: isize, l: isize, r: isize, f: &F) -> (M::S,Option<usize>,isize,isize) where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return (M::identity(),None,l,r);
+        }
+        if left==l {
+            let x=self.x(node_ind);
+            return if f(&x) {
+                (x.clone(),None,l,r)
+            } else {
+                (M::identity(),node_ind,l,r)
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if left>m {
+            self.get_right_prod(self.nodes[ind].right, left, m+1, r, f)
+        } else {
+            let (left_x,ind_ret,l_ret,r_ret)=self.get_right_prod(self.nodes[ind].left, left, l, m, f);
+            if ind_ret.is_none() {
+                let x=M::binary_operation(&left_x, &self.x(self.nodes[ind].right));
+                if f(&x) {
+                    (x.clone(),None,l,r)
+                } else {
+                    (left_x,self.nodes[ind].right,m+1,r)
+                }
+            } else {
+                (left_x,ind_ret,l_ret,r_ret)
+            }
+        }
+    }
+    /// 再帰的に条件fを満たす右端を返す関数（左閉右開区間）
+    fn get_max_right<F>(&self, node_ind: Option<usize>, offset: M::S, l: isize, r: isize, f: &F) -> isize where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return r;
+        }
+        if l==r {
+            let x=M::binary_operation(&offset, &self.x(node_ind));
+            return if f(&x) {
+                r
+            } else {
+                l-1
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        let x=M::binary_operation(&offset, &self.x(self.nodes[ind].left));
+        if f(&x) {
+            self.get_max_right(self.nodes[ind].right, x, m+1, r, f)
+        } else {
+            self.get_max_right(self.nodes[ind].left, offset, l, m, f)
+        }
+    }
+    /// 再帰的に左端からのモノイド積と条件fを満たさない右端を返す関数
+    fn get_left_prod<F>(&self, node_ind: Option<usize>, right: isize, l: isize, r: isize, f: &F) -> (M::S,Option<usize>,isize,isize) where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return (M::identity(),None,l,r);
+        }
+        if right==r {
+            let x=self.x(node_ind);
+            return if f(&x) {
+                (x.clone(),None,l,r)
+            } else {
+                (M::identity(),node_ind,l,r)
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if right<=m {
+            self.get_left_prod(self.nodes[ind].left, right, l, m, f)
+        } else {
+            let (right_x,ind_ret,l_ret,r_ret)=self.get_left_prod(self.nodes[ind].right, right, m+1, r, f);
+            if ind_ret.is_none() {
+                let x=M::binary_operation(&self.x(self.nodes[ind].left), &right_x);
+                if f(&x) {
+                    (x.clone(),None,l,r)
+                } else {
+                    (right_x,self.nodes[ind].left,l,m)
+                }
+            } else {
+                (right_x,ind_ret,l_ret,r_ret)
+            }
+        }
+    }
+    /// 再帰的に条件fを満たす左端を返す関数（左閉右開区間）
+    fn get_min_left<F>(&self, node_ind: Option<usize>, offset: M::S, l: isize, r: isize, f: &F) -> isize where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return l;
+        }
+        if l==r {
+            let x=M::binary_operation(&self.x(node_ind), &offset);
+            return if f(&x) {
+                l
+            } else {
+                r+1
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        let x=M::binary_operation(&self.x(self.nodes[ind].right), &offset);
+        if f(&x) {
+            self.get_min_left(self.nodes[ind].left, x, l, m, f)
+        } else {
+            self.get_min_left(self.nodes[ind].right, offset, m+1, r, f)
+        }
+    }
     /// pの位置にxを代入する関数
     pub fn set<T>(&mut self, p: T, x: M::S) where T: num::PrimInt {
         let p=p.to_isize().unwrap();
@@ -4531,6 +4649,37 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
     /// 全区間のモノイド積を返す関数
     pub fn all_prod(&self) -> M::S {
         self.x(Some(0))
+    }
+    /// 左端を固定したセグ木上の二分探索（fは条件を表す関数）
+    pub fn max_right<T,F>(&self, l: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
+        let l=l.to_isize().unwrap();
+        debug_assert!(self.min_p<=l && l<=self.max_p+1);
+        debug_assert!(f(&M::identity()));
+        if l==self.max_p+1 {
+            return T::from(self.max_p+1).unwrap();
+        }
+        let (offset,node_ind,left,right)=self.get_right_prod(Some(0), l, self.min_p, self.max_p, &f);
+        if node_ind.is_none() {
+            return T::from(self.max_p+1).unwrap();
+        }
+        let ret=self.get_max_right(node_ind, offset, left, right, &f);
+        T::from(ret+1).unwrap()
+    }
+    /// 右端を固定したセグ木上の二分探索（fは条件を表す関数）
+    pub fn min_left<T,F>(&self, r: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
+        let r=r.to_isize().unwrap();
+        debug_assert!(self.min_p<=r && r<=self.max_p+1);
+        debug_assert!(f(&M::identity()));
+        if r==self.min_p {
+            return T::from(self.min_p).unwrap();
+        }
+        let r=r-1;
+        let (offset,node_ind,left,right)=self.get_left_prod(Some(0), r, self.min_p, self.max_p, &f);
+        if node_ind.is_none() {
+            return T::from(self.min_p).unwrap();
+        }
+        let ret=self.get_min_left(node_ind, offset, left, right, &f);
+        T::from(ret).unwrap()
     }
 }
 
