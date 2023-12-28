@@ -1,6 +1,5 @@
 # not_leonian_ac_lib
 AtCoderのためのRustの自作ライブラリです。src/lib.rsとsrc/main.rsからなります。
-提出した後のコンパイルは結構長いです。
 
 ## src/lib.rs
 ライブラリです。「cargo doc --open」で実装している内容の詳細を確認できます。
@@ -12,3 +11,5 @@ Cargo.tomlのdependenciesにこのライブラリを入れ、実際にAtCoderに
 ```rust
 #[allow(unused_attributes)] #[macro_use] #[allow(unused_imports)] use not_leonian_ac_lib::*;
 ```
+
+私はコード長を短くするために[not_leonian_ac_submit](https://github.com/NotLeonian/not_leonian_ac_submit)を使用していますが、現状は動作の保証ができていないので注意。

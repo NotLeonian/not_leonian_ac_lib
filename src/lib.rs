@@ -8,7 +8,7 @@
 #[macro_export]
 macro_rules! outputln {
     ($var:expr) => {
-        println!("{}",$var);
+        println!("{}",$var)
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{} ",$var);
@@ -20,7 +20,7 @@ macro_rules! outputln {
 #[macro_export]
 macro_rules! debugln {
     ($var:expr) => {
-        println!("{:?}",$var);
+        println!("{:?}",$var)
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{:?} ",$var);
@@ -135,7 +135,7 @@ impl OutputValOr for usize {
 macro_rules! eoutputln {
     ($var:expr) => {
         #[cfg(debug_assertions)]
-        eprintln!("{}",$var);
+        eprintln!("{}",$var)
     };
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
@@ -149,7 +149,7 @@ macro_rules! eoutputln {
 macro_rules! edebugln {
     ($var:expr) => {
         #[cfg(debug_assertions)]
-        eprintln!("{:?}",$var);
+        eprintln!("{:?}",$var)
     };
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
@@ -1754,6 +1754,26 @@ impl<I> One for ac_library::DynamicModInt<I> where I: ac_library::Id {
     }
 }
 
+/// プリミティブな整数型についてZeroとOneトレイトを記述するマクロ
+macro_rules! zero_one {
+    ($($ty:ty),*) => {
+        $(
+            impl Zero for $ty {
+                fn zero_val() -> Self {
+                    0
+                }
+            }
+            impl One for $ty {
+                fn one_val() -> Self {
+                    1
+                }
+            }
+        )*
+    }
+}
+
+zero_one!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
 /// ModIntの逆元についてのトレイト
 pub trait ModIntInv where Self: Sized {
     /// ModIntの逆元をベクターで列挙する関数（最初の要素には0が入る）
@@ -1975,7 +1995,7 @@ pub type RangeSet<T>=std::collections::BTreeSet<(T,T)>;
 /// 区間を管理する集合のトレイト（現状は区間追加と区間削除には非対応）
 pub trait SetOfRanges<T> {
     /// 初期化する関数
-    fn new() -> Self;
+    fn initialize() -> Self;
     /// valが集合に属するかどうかを判定し、属するならば属する区間を返す関数（返り値はOption）
     fn includes(&self, val: T) -> Option<(T,T)>;
     /// valを集合に追加する関数（返り値は追加できたかどうか）
@@ -1987,7 +2007,7 @@ pub trait SetOfRanges<T> {
 }
 
 impl SetOfRanges<usize> for std::collections::BTreeSet<(usize,usize)> {
-    fn new() -> Self {
+    fn initialize() -> Self {
         std::collections::BTreeSet::default()
     }
     fn includes(&self, val: usize) -> Option<(usize,usize)> {
@@ -2060,7 +2080,7 @@ impl SetOfRanges<usize> for std::collections::BTreeSet<(usize,usize)> {
 }
 
 impl SetOfRanges<isize> for std::collections::BTreeSet<(isize,isize)> {
-    fn new() -> Self {
+    fn initialize() -> Self {
         std::collections::BTreeSet::default()
     }
     fn includes(&self, val: isize) -> Option<(isize,isize)> {
@@ -2123,16 +2143,6 @@ impl SetOfRanges<isize> for std::collections::BTreeSet<(isize,isize)> {
             0
         }
     }
-}
-
-/// 座標圧縮のトレイト（0-indexed）
-pub trait Compress where Self: Sized {
-    /// 圧縮した結果の型
-    type T1;
-    /// 圧縮する前の値の型
-    type T2;
-    /// 座標圧縮し、圧縮した結果と圧縮する前の値の一覧を返す関数（0-indexed）
-    fn compress(&self) -> (Self::T1, Self::T2);
 }
 
 /// ランレングス圧縮のトレイト
@@ -3600,8 +3610,7 @@ impl WeightedDSU {
     }
 }
 
-/// slope trickの構造体（プリミティブな整数型および浮動小数点型に対応）
-/// （ただし浮動小数点型で用いる場合は型パラメータをordered_float::OrderedFloatとすることに注意）
+/// slope trickの構造体
 #[derive(Clone, Default, Debug)]
 pub struct SlopeTrick<T> where T: Ord {
     min: T,
@@ -3611,19 +3620,19 @@ pub struct SlopeTrick<T> where T: Ord {
     right_offset: T
 }
 
-impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float + std::ops::AddAssign {
+impl<T> SlopeTrick<T> where T: Default + num::PrimInt + std::ops::AddAssign {
     /// 初期化の関数
     pub fn new() -> Self {
         SlopeTrick::default()
     }
     /// 関数の最小値を返す関数
     pub fn min(&self) -> T {
-        self.min.0
+        self.min
     }
     /// 最小値をとる点の最小値を返す関数（存在しなければNoneを返す）
     pub fn left_min_point(&self) -> Option<T> {
         if let Some(&p)=self.left_vertices.peek() {
-            Some((p+self.left_offset).0)
+            Some(p+self.left_offset)
         } else {
             None
         }
@@ -3631,7 +3640,7 @@ impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float
     /// 最小値をとる点の最大値を返す関数（存在しなければNoneを返す）
     pub fn right_min_point(&self) -> Option<T> {
         if let Some(&p)=self.right_vertices.peek() {
-            Some((p+self.right_offset).0)
+            Some(p+self.right_offset)
         } else {
             None
         }
@@ -3640,11 +3649,9 @@ impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float
     pub fn add_const(&mut self, c: T) {
         self.min+=c;
     }
-    /// 関数にmax(p-x,0)を足す関数
+    /// 関数にmax{p-x,0}を足す関数
     pub fn add_left_slope(&mut self, p: T) {
-        let p=ordered_float::OrderedFloat(p);
         if let Some(mp)=self.right_min_point() {
-            let mp=ordered_float::OrderedFloat(mp);
             if p>mp {
                 self.min+=p-mp;
                 self.right_vertices.push(p-self.right_offset);
@@ -3657,11 +3664,9 @@ impl<T> SlopeTrick<ordered_float::OrderedFloat<T>> where T: Default + num::Float
             self.left_vertices.push(p-self.left_offset);
         }
     }
-    /// 関数にmax(x-p,0)を足す関数
+    /// 関数にmax{x-p,0}を足す関数
     pub fn add_right_slope(&mut self, p: T) {
-        let p=ordered_float::OrderedFloat(p);
         if let Some(mp)=self.left_min_point() {
-            let mp=ordered_float::OrderedFloat(mp);
             if p<mp {
                 self.min+=mp-p;
                 self.left_vertices.push(p-self.left_offset);
@@ -4991,145 +4996,5 @@ impl<T> RationalReconstruct for Vec<T> where T: RationalReconstruct {
         self.iter().map(|v| v.rational_reconstruct()).collect::<Self::Output>()
     }
 }
-
-/// isizeとusizeについてimplを定義するマクロ（別のジェネリクスと併用したい場合などに使用）
-macro_rules! impl_iusize {
-    ($($ty:ty),*) => {
-        $(
-            impl Compress for Vec<$ty> {
-                type T1 = Vec<usize>;
-                type T2 = Vec<$ty>;
-                fn compress(&self) -> (Self::T1, Self::T2) {
-                    let mut list=self.clone();
-                    list.sort();
-                    list.dedup();
-                    let len=list.len();
-                    let mut nums=vec![0;self.len()];
-                    for i in 0..self.len() {
-                        nums[i]=binary_search(0, len, |mid| list[mid]<=self[i]);
-                    }
-                    (nums,list)
-                }
-            }
-
-            impl Compress for Vec<Vec<$ty>> {
-                type T1 = Vec<Vec<usize>>;
-                type T2 = Vec<$ty>;
-                fn compress(&self) -> (Self::T1, Self::T2) {
-                    let mut list=Vec::new();
-                    for i in 0..self.len() {
-                        for j in 0..self[i].len() {
-                            list.push(self[i][j].clone());
-                        }
-                    }
-                    let len=list.len();
-                    let mut nums=vec_range(0, self.len(), |i| vec![0;self[i].len()]);
-                    for i in 0..self.len() {
-                        for j in 0..self[i].len() {
-                            nums[i][j]=binary_search(0, len, |mid| list[mid]<=self[i][j]);
-                        }
-                    }
-                    (nums,list)
-                }
-            }
-
-            impl SlopeTrick<$ty> {
-                pub fn new() -> Self {
-                    SlopeTrick::default()
-                }
-                pub fn min(&self) -> $ty {
-                    self.min
-                }
-                pub fn left_min_point(&self) -> Option<$ty> {
-                    if let Some(&p)=self.left_vertices.peek() {
-                        Some(p+self.left_offset)
-                    } else {
-                        None
-                    }
-                }
-                pub fn right_min_point(&self) -> Option<$ty> {
-                    if let Some(&p)=self.right_vertices.peek() {
-                        Some(p+self.right_offset)
-                    } else {
-                        None
-                    }
-                }
-                pub fn add_const(&mut self, c: $ty) {
-                    self.min+=c;
-                }
-                pub fn add_left_slope(&mut self, p: $ty) {
-                    if let Some(mp)=self.right_min_point() {
-                        if p>mp {
-                            self.min+=p-mp;
-                            self.right_vertices.push(p-self.right_offset);
-                            self.right_vertices.pop();
-                            self.left_vertices.push(mp-self.left_offset);
-                        } else {
-                            self.left_vertices.push(p-self.left_offset);
-                        }
-                    } else {
-                        self.left_vertices.push(p-self.left_offset);
-                    }
-                }
-                pub fn add_right_slope(&mut self, p: $ty) {
-                    if let Some(mp)=self.left_min_point() {
-                        if p<mp {
-                            self.min+=mp-p;
-                            self.left_vertices.push(p-self.left_offset);
-                            self.left_vertices.pop();
-                            self.right_vertices.push(mp-self.right_offset);
-                        } else {
-                            self.right_vertices.push(p-self.right_offset);
-                        }
-                    } else {
-                        self.right_vertices.push(p-self.right_offset);
-                    }
-                }
-                pub fn add_abs_slope(&mut self, p: $ty) {
-                    self.add_left_slope(p);
-                    self.add_right_slope(p);
-                }
-                pub fn prefix_min(&mut self) {
-                    self.right_vertices.clear();
-                }
-                pub fn suffix_min(&mut self) {
-                    self.left_vertices.clear();
-                }
-                pub fn shift(&mut self, a: $ty) {
-                    self.left_offset+=a;
-                    self.right_offset+=a;
-                }
-                pub fn sliding_window_minimum(&mut self, a: $ty, b: $ty) {
-                    debug_assert!(a<=b);
-                    self.left_offset+=a;
-                    self.right_offset+=b;
-                }
-            }
-        )*
-    }
-}
-
-impl_iusize!(isize, usize);
-
-/// プリミティブな整数型についてimplを定義するマクロ（別のジェネリクスと併用したい場合などに使用）
-macro_rules! impl_integer {
-    ($($ty:ty),*) => {
-        $(
-            impl Zero for $ty {
-                fn zero_val() -> Self {
-                    0
-                }
-            }
-
-            impl One for $ty {
-                fn one_val() -> Self {
-                    1
-                }
-            }
-        )*
-    }
-}
-
-impl_integer!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
 // not_leonian_ac_lib until this line
