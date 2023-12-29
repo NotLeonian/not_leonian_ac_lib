@@ -4938,10 +4938,10 @@ impl<T> BitDigits for T where Self: num::PrimInt {
     }
 }
 
-/// 10のi乗のstatic定数
-pub static E: [usize;20]=gen_e();
+/// 10のi乗の定数
+pub const E: [usize;20]=gen_e();
 
-/// 10のi乗のstatic定数を生成するconst関数
+/// 10のi乗の定数を生成するconst関数
 const fn gen_e() -> [usize;20] {
     let mut e=[1;20];
     let mut i=1;
