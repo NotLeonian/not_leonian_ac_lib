@@ -470,6 +470,11 @@ impl<T> ChminChmax for T where T: Clone + PartialOrd {
     }
 }
 
+/// 2次元平面上の2つの頂点のユークリッド距離を返す関数
+pub fn two_d_hypot<T>(a: (T,T), b: (T,T)) -> T where T: num_traits::Float {
+    ((a.0-b.0).powi(2)+(a.1-b.1).powi(2)).sqrt()
+}
+
 /// ソートされているベクターどうしを、ソートされた1つのベクターへマージする関数
 pub fn merge_vecs<T>(a: &Vec<T>, b: &Vec<T>) -> Vec<T> where T: Clone + PartialOrd {
     itertools::Itertools::merge(a.iter(), b.iter()).cloned().collect()
@@ -558,6 +563,27 @@ impl VecGraph {
         let mut g=VecGraph::new(n);
         for &(a,b,w) in abw {
             g.graph[a].push((b, w));
+        }
+        g
+    }
+    /// 2次元グリッドから重みなし無向グラフを構築する関数（グリッドの\[i\]\[j\]マス目にあたる頂点は\[i*w+j\]で、wallが辺のない頂点を表す文字）
+    pub fn from_grid(h: usize, w: usize, grid: &Vec<Vec<char>>, wall: char) -> Self {
+        let mut g=VecGraph::new(h*w);
+        for i in 0..h-1 {
+            for j in 0..w {
+                if grid[i][j]!=wall && grid[i+1][j]!=wall {
+                    g.graph[i*w+j].push(((i+1)*w+j, 1));
+                    g.graph[(i+1)*w+j].push((i*w+j, 1));
+                }
+            }
+        }
+        for i in 0..h {
+            for j in 0..w-1 {
+                if grid[i][j]!=wall && grid[i][j+1]!=wall {
+                    g.graph[i*w+j].push((i*w+j+1, 1));
+                    g.graph[i*w+j+1].push((i*w+j, 1));
+                }
+            }
         }
         g
     }
@@ -971,6 +997,27 @@ impl MapGraph {
         let mut g=MapGraph::new(n);
         for &(a,b,w) in abw {
             g.graph[a].insert(b, w);
+        }
+        g
+    }
+    /// 2次元グリッドから重みなし無向グラフを構築する関数（グリッドの\[i\]\[j\]マス目にあたる頂点は\[i*w+j\]で、wallが辺のない頂点を表す文字）
+    pub fn from_grid(h: usize, w: usize, grid: &Vec<Vec<char>>, wall: char) -> Self {
+        let mut g=MapGraph::new(h*w);
+        for i in 0..h-1 {
+            for j in 0..w {
+                if grid[i][j]!=wall && grid[i+1][j]!=wall {
+                    g.graph[i*w+j].insert((i+1)*w+j, 1);
+                    g.graph[(i+1)*w+j].insert(i*w+j, 1);
+                }
+            }
+        }
+        for i in 0..h {
+            for j in 0..w-1 {
+                if grid[i][j]!=wall && grid[i][j+1]!=wall {
+                    g.graph[i*w+j].insert(i*w+j+1, 1);
+                    g.graph[i*w+j+1].insert(i*w+j, 1);
+                }
+            }
         }
         g
     }
@@ -1724,6 +1771,18 @@ pub trait Zero {
     fn zero_val() -> Self;
 }
 
+impl Zero for f32 {
+    fn zero_val() -> Self {
+        0.
+    }
+}
+
+impl Zero for f64 {
+    fn zero_val() -> Self {
+        0.
+    }
+}
+
 impl<M> Zero for ac_library::StaticModInt<M> where M: ac_library::Modulus {
     fn zero_val() -> Self {
         Self::new(0)
@@ -1751,6 +1810,18 @@ impl<M> One for ac_library::StaticModInt<M> where M: ac_library::Modulus {
 impl<I> One for ac_library::DynamicModInt<I> where I: ac_library::Id {
     fn one_val() -> Self {
         Self::new(1)
+    }
+}
+
+impl One for f32 {
+    fn one_val() -> Self {
+        1.
+    }
+}
+
+impl One for f64 {
+    fn one_val() -> Self {
+        1.
     }
 }
 
