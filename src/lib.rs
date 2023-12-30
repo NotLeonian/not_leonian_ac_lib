@@ -906,6 +906,69 @@ impl VecGraph {
             None
         }
     }
+    /// lowlinkを行い、順にordとlowとDFS木の親を返す関数
+    pub fn lowlink(&self) -> (Vec<usize>,Vec<usize>,Vec<usize>) {
+        let n=self.size();
+        let mut ord=vec![n;n];
+        let mut low=vec![n;n];
+        let mut parent=vec![n;n];
+        let mut stack=Vec::<usize>::new();
+        let mut cnt=0;
+        for i in 0..n {
+            stack.push(i);
+            while let Some(v)=stack.pop() {
+                if v<n {
+                    if ord[v]<n {
+                        continue;
+                    }
+                    ord[v]=cnt;
+                    low[v]=cnt;
+                    cnt+=1;
+                    for &(u,_) in &self.graph[v] {
+                        if ord[u]==n {
+                            parent[u]=v;
+                            stack.push(u+n);
+                            stack.push(u);
+                        } else if parent[v]!=u && ord[u]<low[v] {
+                            low[v]=ord[u];
+                        }
+                    }
+                } else {
+                    let v=v-n;
+                    if low[v]<low[parent[v]] {
+                        low[parent[v]]=low[v];
+                    }
+                }
+            }
+        }
+        (ord,low,parent)
+    }
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vが関節点であるか判定する関数
+    pub fn is_articulation_point(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
+        if parent[v]==self.size() {
+            self.graph[v].iter().filter(|&&(u,_)| parent[u]==v).count()>1
+        } else {
+            self.graph[v].iter().any(|&(u,_)| parent[u]==v && ord[v]<=low[u])
+        }
+    }
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
+    pub fn is_bridge(&self, a: usize, b: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
+        if parent[b]==a {
+            ord[a]<low[b]
+        } else if parent[a]==b {
+            ord[b]<low[a]
+        } else {
+            false
+        }
+    }
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vを削除した後の連結成分の個数を返す関数（元から頂点vを含んでいない連結成分は考慮されないことに注意）
+    pub fn number_of_connected_components_after_removing(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
+        if parent[v]==self.size() {
+            self.graph[v].iter().filter(|&&(u,_)| parent[u]==v).count()
+        } else {
+            self.graph[v].iter().filter(|&&(u,_)| parent[u]==v && ord[v]<=low[u]).count()+1
+        }
+    }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
     pub fn pruefer_code(&self) -> Vec<usize> {
         let n=self.size();
@@ -1347,6 +1410,69 @@ impl MapGraph {
             Some(ts.answer().to_vec())
         } else {
             None
+        }
+    }
+    /// lowlinkを行い、順にordとlowとDFS木の親を返す関数
+    pub fn lowlink(&self) -> (Vec<usize>,Vec<usize>,Vec<usize>) {
+        let n=self.size();
+        let mut ord=vec![n;n];
+        let mut low=vec![n;n];
+        let mut parent=vec![n;n];
+        let mut stack=Vec::<usize>::new();
+        let mut cnt=0;
+        for i in 0..n {
+            stack.push(i);
+            while let Some(v)=stack.pop() {
+                if v<n {
+                    if ord[v]<n {
+                        continue;
+                    }
+                    ord[v]=cnt;
+                    low[v]=cnt;
+                    cnt+=1;
+                    for (&u,_) in &self.graph[v] {
+                        if ord[u]==n {
+                            parent[u]=v;
+                            stack.push(u+n);
+                            stack.push(u);
+                        } else if parent[v]!=u && ord[u]<low[v] {
+                            low[v]=ord[u];
+                        }
+                    }
+                } else {
+                    let v=v-n;
+                    if low[v]<low[parent[v]] {
+                        low[parent[v]]=low[v];
+                    }
+                }
+            }
+        }
+        (ord,low,parent)
+    }
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vが関節点であるか判定する関数
+    pub fn is_articulation_point(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
+        if parent[v]==self.size() {
+            self.graph[v].iter().filter(|&(&u,_)| parent[u]==v).count()>1
+        } else {
+            self.graph[v].iter().any(|(&u,_)| parent[u]==v && ord[v]<=low[u])
+        }
+    }
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
+    pub fn is_bridge(&self, a: usize, b: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
+        if parent[b]==a {
+            ord[a]<low[b]
+        } else if parent[a]==b {
+            ord[b]<low[a]
+        } else {
+            false
+        }
+    }
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vを削除した後の連結成分の個数を返す関数（元から頂点vを含んでいない連結成分は考慮されないことに注意）
+    pub fn number_of_connected_components_after_removing(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
+        if parent[v]==self.size() {
+            self.graph[v].iter().filter(|&(&u,_)| parent[u]==v).count()
+        } else {
+            self.graph[v].iter().filter(|&(&u,_)| parent[u]==v && ord[v]<=low[u]).count()+1
         }
     }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
