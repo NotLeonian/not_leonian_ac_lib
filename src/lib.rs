@@ -943,12 +943,12 @@ impl VecGraph {
         }
         (ord,low,parent)
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vが関節点であるか判定する関数
-    pub fn is_articulation_point(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
-        if parent[v]==self.size() {
-            self.graph[v].iter().filter(|&&(u,_)| parent[u]==v).count()>1
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aが関節点であるか判定する関数
+    pub fn is_articulation_point(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
+        if parent[a]==self.size() {
+            self.graph[a].iter().filter(|&&(b,_)| parent[b]==a).count()>1
         } else {
-            self.graph[v].iter().any(|&(u,_)| parent[u]==v && ord[v]<=low[u])
+            self.graph[a].iter().any(|&(b,_)| parent[b]==a && ord[a]<=low[b])
         }
     }
     /// lowlinkの結果ordとlowおよびparentをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
@@ -961,12 +961,12 @@ impl VecGraph {
             false
         }
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vを削除した後の連結成分の個数を返す関数（元から頂点vを含んでいない連結成分は考慮されないことに注意）
-    pub fn number_of_connected_components_after_removing(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
-        if parent[v]==self.size() {
-            self.graph[v].iter().filter(|&&(u,_)| parent[u]==v).count()
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aを削除した後の連結成分の個数を返す関数（元から頂点aを含んでいない連結成分は考慮されないことに注意）
+    pub fn number_of_connected_components_after_removing(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
+        if parent[a]==self.size() {
+            self.graph[a].iter().filter(|&&(b,_)| parent[b]==a).count()
         } else {
-            self.graph[v].iter().filter(|&&(u,_)| parent[u]==v && ord[v]<=low[u]).count()+1
+            self.graph[a].iter().filter(|&&(b,_)| parent[b]==a && ord[a]<=low[b]).count()+1
         }
     }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
@@ -1449,12 +1449,12 @@ impl MapGraph {
         }
         (ord,low,parent)
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vが関節点であるか判定する関数
-    pub fn is_articulation_point(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
-        if parent[v]==self.size() {
-            self.graph[v].iter().filter(|&(&u,_)| parent[u]==v).count()>1
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aが関節点であるか判定する関数
+    pub fn is_articulation_point(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
+        if parent[a]==self.size() {
+            self.graph[a].iter().filter(|&(&b,_)| parent[b]==a).count()>1
         } else {
-            self.graph[v].iter().any(|(&u,_)| parent[u]==v && ord[v]<=low[u])
+            self.graph[a].iter().any(|(&b,_)| parent[b]==a && ord[a]<=low[b])
         }
     }
     /// lowlinkの結果ordとlowおよびparentをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
@@ -1467,12 +1467,12 @@ impl MapGraph {
             false
         }
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点vを削除した後の連結成分の個数を返す関数（元から頂点vを含んでいない連結成分は考慮されないことに注意）
-    pub fn number_of_connected_components_after_removing(&self, v: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
-        if parent[v]==self.size() {
-            self.graph[v].iter().filter(|&(&u,_)| parent[u]==v).count()
+    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aを削除した後の連結成分の個数を返す関数（元から頂点aを含んでいない連結成分は考慮されないことに注意）
+    pub fn number_of_connected_components_after_removing(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
+        if parent[a]==self.size() {
+            self.graph[a].iter().filter(|&(&b,_)| parent[b]==a).count()
         } else {
-            self.graph[v].iter().filter(|&(&u,_)| parent[u]==v && ord[v]<=low[u]).count()+1
+            self.graph[a].iter().filter(|&(&b,_)| parent[b]==a && ord[a]<=low[b]).count()+1
         }
     }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
@@ -3783,7 +3783,7 @@ impl WeightedDSU {
     pub fn dist(&mut self, a: usize, b: usize) -> isize {
         self.potential(a)-self.potential(b)
     }
-    /// 現在のグラフと無矛盾である場合、頂点aと頂点bを連結にしてself.dist(a,b)の値をdistにする関数（返り値は現在のグラフと無矛盾であるかどうか）
+    /// 現在のグラフと無矛盾である場合、頂点aと頂点bを結ぶ辺を追加してself.dist(a,b)の値をdistにする関数（返り値は現在のグラフと無矛盾であるかどうか）
     pub fn merge(&mut self, mut a: usize, mut b: usize, mut dist: isize) -> bool {
         dist+=self.potential(b)-self.potential(a);
         a=self.leader(a);
@@ -3800,10 +3800,75 @@ impl WeightedDSU {
         self.potentials[a]=dist;
         true
     }
-    /// 頂点aの属する連結成分のサイズを返す関数
+    /// 頂点aの属する連結成分の頂点数を返す関数
     pub fn size(&mut self, a: usize) -> usize {
         let leader=self.leader(a);
         (-self.parents[leader]) as usize
+    }
+}
+
+/// Undo可能Union-Findの構造体（0-indexed）
+pub struct DSUWithRollback {
+    parents: Vec<isize>,
+    archives: Vec<((usize,isize),(usize,isize))>
+}
+
+impl DSUWithRollback {
+    /// n頂点のUndo可能Union-Findを初期化する関数
+    pub fn new(n: usize) -> Self {
+        DSUWithRollback { parents: vec![-1;n], archives: Vec::new() }
+    }
+    /// 頂点aの属する連結成分の代表元を返す関数
+    pub fn leader(&self, a: usize) -> usize {
+        if self.parents[a]<0 {
+            return a;
+        }
+        return self.leader(self.parents[a] as usize);
+    }
+    /// 頂点a,bが連結かどうかを返す関数
+    pub fn same(&mut self, a: usize, b: usize) -> bool {
+        self.leader(a)==self.leader(b)
+    }
+    /// 頂点aと頂点bを結ぶ辺を追加する関数（返り値は元は連結でなかったか）
+    pub fn merge(&mut self, mut a: usize, mut b: usize) -> bool {
+        a=self.leader(a);
+        b=self.leader(b);
+        self.archives.push(((a,self.parents[a]),(b,self.parents[b])));
+        if a==b {
+            return false;
+        }
+        if self.parents[a]<self.parents[b] {
+            std::mem::swap(&mut a, &mut b);
+        }
+        self.parents[b]+=self.parents[a];
+        self.parents[a]=b as isize;
+        true
+    }
+    /// 頂点aの属する連結成分の頂点数を返す関数
+    pub fn size(&mut self, a: usize) -> usize {
+        let leader=self.leader(a);
+        (-self.parents[leader]) as usize
+    }
+    /// merge関数の操作を1回取り消す関数（返り値は戻すことができたかどうか）
+    pub fn undo(&mut self) -> bool {
+        if let Some(((a,pa),(b,pb)))=self.archives.pop() {
+            self.parents[a]=pa;
+            self.parents[b]=pb;
+            true
+        } else {
+            false
+        }
+    }
+    /// 現在のグラフの番号を返す関数
+    pub fn current_number(&self) -> usize {
+        self.archives.len()
+    }
+    /// merge関数の操作を1回取り消す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
+    pub fn rollback(&mut self, to: usize) {
+        debug_assert!(to<=self.archives.len());
+        while to<self.archives.len() {
+            self.undo();
+        }
     }
 }
 
