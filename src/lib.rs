@@ -3479,6 +3479,55 @@ impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<
     }
 }
 
+/// 永続stackの構造体
+pub struct PersistentStack<T> {
+    stack: Vec<(Option<usize>,T)>
+}
+
+impl<T> PersistentStack<T> where T: Default + Clone {
+    pub fn new() -> Self {
+        Self { stack: vec![(None,T::default())] }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.stack.last().unwrap().0.is_none()
+    }
+    pub fn push(&mut self, item: T) {
+        self.stack.push((Some(self.stack.len()-1),item))
+    }
+    pub fn pop(&mut self) -> Option<T> {
+        if let Some(prev)=self.stack.last().unwrap().0 {
+            let ret=self.stack.last().unwrap().1.clone();
+            self.stack.push(self.stack[prev].clone());
+            Some(ret)
+        } else {
+            None
+        }
+    }
+    pub fn last(&self) -> Option<&T> {
+        if !self.is_empty() {
+            let ret=&self.stack.last().unwrap().1;
+            Some(ret)
+        } else {
+            None
+        }
+    }
+    pub fn clear(&mut self) {
+        self.stack.push((None,T::default()));
+    }
+    /// 現在のstackの番号を返す関数
+    pub fn current_number(&self) -> usize {
+        self.stack.len()-1
+    }
+    /// 指定した番号のstackの末尾を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn peek(&self, number: usize) -> &T {
+        &self.stack[number].1
+    }
+    /// 指定した番号のstackに戻す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
+    pub fn rollback(&mut self, to: usize) {
+        self.stack.push(self.stack[to].clone());
+    }
+}
+
 /// 簡易的なハッシュの構造体
 #[derive(Clone, Debug)]
 pub struct Hashes<T> {
@@ -3808,6 +3857,7 @@ impl WeightedDSU {
 }
 
 /// Undo可能Union-Findの構造体（0-indexed）
+#[derive(Clone, Debug)]
 pub struct DSUWithRollback {
     parents: Vec<isize>,
     archives: Vec<((usize,isize),(usize,isize))>
@@ -3863,7 +3913,7 @@ impl DSUWithRollback {
     pub fn current_number(&self) -> usize {
         self.archives.len()
     }
-    /// merge関数の操作を1回取り消す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
+    /// 指定した番号までグラフを戻す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
     pub fn rollback(&mut self, to: usize) {
         debug_assert!(to<=self.archives.len());
         while to<self.archives.len() {
