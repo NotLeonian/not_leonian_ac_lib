@@ -2,4 +2,5 @@
 - const fn
 
 # 追加したいデータ構造やアルゴリズム
-- 永続セグ木
+- 部分永続Union-Find
+- 完全永続Union-Find

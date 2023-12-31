@@ -12,4 +12,4 @@ Cargo.tomlのdependenciesにこのライブラリを入れ、実際にAtCoderに
 #[allow(unused_attributes)] #[macro_use] #[allow(unused_imports)] use not_leonian_ac_lib::*;
 ```
 
-私はコード長を短くするために[not_leonian_ac_submit](https://github.com/NotLeonian/not_leonian_ac_submit)を使用していますが、現状は動作の保証ができていないので注意。
+私はコード長を短くするために[not_leonian_ac_submit](https://github.com/NotLeonian/not_leonian_ac_submit)を使用していますが、バグっていてCEになる可能性を完全には否定できないので注意。

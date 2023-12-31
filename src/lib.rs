@@ -3480,6 +3480,7 @@ impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<
 }
 
 /// 永続stackの構造体
+#[derive(Clone, Debug)]
 pub struct PersistentStack<T> {
     stack: Vec<(Option<usize>,T)>
 }
@@ -3519,7 +3520,7 @@ impl<T> PersistentStack<T> where T: Default + Clone {
         self.stack.len()-1
     }
     /// 指定した番号のstackの末尾を返す関数（numberはcurrent_number関数の返す番号と同じ）
-    pub fn peek(&self, number: usize) -> &T {
+    pub fn past(&self, number: usize) -> &T {
         &self.stack[number].1
     }
     /// 指定した番号のstackに戻す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
@@ -4992,6 +4993,402 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
         }
         let r=r-1;
         let (offset,node_ind,left,right)=self.get_left_prod(Some(0), r, self.min_p, self.max_p, &f);
+        if node_ind.is_none() {
+            return T::from(self.min_p).unwrap();
+        }
+        let ret=self.get_min_left(node_ind, offset, left, right, &f);
+        T::from(ret).unwrap()
+    }
+}
+
+/// 永続セグ木のノードの構造体
+#[derive(Clone, Default, Debug)]
+struct PersistentSegtreeNode<M> where M: ac_library::Monoid {
+    x: M::S,
+    left: Option<usize>,
+    right: Option<usize>,
+}
+
+/// 永続セグ木の構造体
+#[derive(Clone, Default, Debug)]
+pub struct PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
+    nodes: Vec<PersistentSegtreeNode<M>>,
+    roots: Vec<usize>,
+    min_p: isize,
+    max_p: isize
+}
+
+impl<M> PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
+    /// 初期化の関数（min_p、max_pはそれぞれクエリの添字がとる閉区間の下端と上端）
+    pub fn new<T>(min_p: T, max_p: T) -> Self where T: num::PrimInt {
+        let min_p=min_p.to_isize().unwrap();
+        let max_p=max_p.to_isize().unwrap();
+        Self { nodes: vec![PersistentSegtreeNode { x: M::identity(), left: None, right: None }], roots: vec![0], min_p, max_p }
+    }
+    /// 指定されたノードがあればそのxを、なければ単位元を返す関数
+    fn x(&self, node_ind: Option<usize>) -> M::S {
+        if let Some(ind)=node_ind {
+            self.nodes[ind].x.clone()
+        } else {
+            M::identity()
+        }
+    }
+    /// 再帰的にxを代入する関数
+    fn set_x(&mut self, mut node_ind: Option<usize>, p: isize, x: M::S, l: isize, r: isize) -> Option<usize> {
+        if node_ind.is_none() {
+            if l==r {
+                self.nodes.push(PersistentSegtreeNode { x, left: None, right: None });
+                return Some(self.nodes.len()-1);
+            }
+            let mut m=(l+r)/2;
+            if m==r {
+                m-=1;
+            }
+            if p<=m {
+                let left=self.set_x(None, p, x.clone(), l, m);
+                self.nodes.push(PersistentSegtreeNode { x: x.clone(), left, right: None });
+            } else {
+                let right=self.set_x(None, p, x.clone(), m+1, r);
+                self.nodes.push(PersistentSegtreeNode { x: x.clone(), left: None, right });
+            }
+            return Some(self.nodes.len()-1);
+        }
+        let ind=node_ind.unwrap();
+        self.nodes.push(PersistentSegtreeNode { x: self.nodes[ind].x.clone(), left: self.nodes[ind].left, right: self.nodes[ind].right });
+        node_ind=Some(self.nodes.len()-1);
+        let ind=node_ind.unwrap();
+        if l==r {
+            self.nodes[ind].x=x;
+            return node_ind;
+        }
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if p<=m {
+            self.nodes[ind].left=self.set_x(self.nodes[ind].left, p, x, l, m);
+        } else {
+            self.nodes[ind].right=self.set_x(self.nodes[ind].right, p, x, m+1, r);
+        }
+        self.nodes[ind].x=M::binary_operation(&self.x(self.nodes[ind].left), &self.x(self.nodes[ind].right));
+        node_ind
+    }
+    /// 再帰的にxを返す関数
+    fn get_x(&self, node_ind: Option<usize>, p:isize, l: isize, r: isize) -> M::S {
+        if node_ind.is_none() {
+            return M::identity();
+        }
+        if l==r {
+            return self.x(node_ind).clone();
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if p<=m {
+            self.get_x(self.nodes[ind].left, p, l, m)
+        } else {
+            self.get_x(self.nodes[ind].right, p, m+1, r)
+        }
+    }
+    /// 再帰的に区間のモノイド積を返す関数
+    fn get_prod(&self, node_ind: Option<usize>, x_l: isize, x_r: isize, l: isize, r: isize) -> M::S {
+        if node_ind.is_none() {
+            return M::identity();
+        }
+        if x_l==l && x_r==r {
+            return self.x(node_ind).clone();
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if x_r<=m {
+            self.get_prod(self.nodes[ind].left, x_l, x_r, l, m)
+        } else if x_l>m {
+            self.get_prod(self.nodes[ind].right, x_l, x_r, m+1, r)
+        } else {
+            M::binary_operation(&self.get_prod(self.nodes[ind].left, x_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, x_r, m+1, r))
+        }
+    }
+    /// 再帰的に右端からのモノイド積と条件fを満たさない左端を返す関数
+    fn get_right_prod<F>(&self, node_ind: Option<usize>, left: isize, l: isize, r: isize, f: &F) -> (M::S,Option<usize>,isize,isize) where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return (M::identity(),None,l,r);
+        }
+        if left==l {
+            let x=self.x(node_ind);
+            return if f(&x) {
+                (x.clone(),None,l,r)
+            } else {
+                (M::identity(),node_ind,l,r)
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if left>m {
+            self.get_right_prod(self.nodes[ind].right, left, m+1, r, f)
+        } else {
+            let (left_x,ind_ret,l_ret,r_ret)=self.get_right_prod(self.nodes[ind].left, left, l, m, f);
+            if ind_ret.is_none() {
+                let x=M::binary_operation(&left_x, &self.x(self.nodes[ind].right));
+                if f(&x) {
+                    (x.clone(),None,l,r)
+                } else {
+                    (left_x,self.nodes[ind].right,m+1,r)
+                }
+            } else {
+                (left_x,ind_ret,l_ret,r_ret)
+            }
+        }
+    }
+    /// 再帰的に条件fを満たす右端を返す関数（左閉右開区間）
+    fn get_max_right<F>(&self, node_ind: Option<usize>, offset: M::S, l: isize, r: isize, f: &F) -> isize where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return r;
+        }
+        if l==r {
+            let x=M::binary_operation(&offset, &self.x(node_ind));
+            return if f(&x) {
+                r
+            } else {
+                l-1
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        let x=M::binary_operation(&offset, &self.x(self.nodes[ind].left));
+        if f(&x) {
+            self.get_max_right(self.nodes[ind].right, x, m+1, r, f)
+        } else {
+            self.get_max_right(self.nodes[ind].left, offset, l, m, f)
+        }
+    }
+    /// 再帰的に左端からのモノイド積と条件fを満たさない右端を返す関数
+    fn get_left_prod<F>(&self, node_ind: Option<usize>, right: isize, l: isize, r: isize, f: &F) -> (M::S,Option<usize>,isize,isize) where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return (M::identity(),None,l,r);
+        }
+        if right==r {
+            let x=self.x(node_ind);
+            return if f(&x) {
+                (x.clone(),None,l,r)
+            } else {
+                (M::identity(),node_ind,l,r)
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        if right<=m {
+            self.get_left_prod(self.nodes[ind].left, right, l, m, f)
+        } else {
+            let (right_x,ind_ret,l_ret,r_ret)=self.get_left_prod(self.nodes[ind].right, right, m+1, r, f);
+            if ind_ret.is_none() {
+                let x=M::binary_operation(&self.x(self.nodes[ind].left), &right_x);
+                if f(&x) {
+                    (x.clone(),None,l,r)
+                } else {
+                    (right_x,self.nodes[ind].left,l,m)
+                }
+            } else {
+                (right_x,ind_ret,l_ret,r_ret)
+            }
+        }
+    }
+    /// 再帰的に条件fを満たす左端を返す関数（左閉右開区間）
+    fn get_min_left<F>(&self, node_ind: Option<usize>, offset: M::S, l: isize, r: isize, f: &F) -> isize where F: Fn(&M::S) -> bool {
+        if node_ind.is_none() {
+            return l;
+        }
+        if l==r {
+            let x=M::binary_operation(&self.x(node_ind), &offset);
+            return if f(&x) {
+                l
+            } else {
+                r+1
+            };
+        }
+        let ind=node_ind.unwrap();
+        let mut m=(l+r)/2;
+        if m==r {
+            m-=1;
+        }
+        let x=M::binary_operation(&self.x(self.nodes[ind].right), &offset);
+        if f(&x) {
+            self.get_min_left(self.nodes[ind].left, x, l, m, f)
+        } else {
+            self.get_min_left(self.nodes[ind].right, offset, m+1, r, f)
+        }
+    }
+    /// pの位置にxを代入する関数
+    pub fn set<T>(&mut self, p: T, x: M::S) where T: num::PrimInt {
+        let p=p.to_isize().unwrap();
+        debug_assert!(self.min_p<=p && p<=self.max_p);
+        let ind=self.set_x(Some(*self.roots.last().unwrap()), p, x, self.min_p, self.max_p).unwrap();
+        self.roots.push(ind);
+    }
+    /// 単位元を代入することで、実質的にpの位置の値を削除する関数
+    pub fn reset<T>(&mut self, p: T) where T: num::PrimInt {
+        self.set(p, M::identity());
+    }
+    /// pの位置のxを返す関数
+    pub fn get<T>(&self, p: T) -> M::S where T: num::PrimInt {
+        let p=p.to_isize().unwrap();
+        debug_assert!(self.min_p<=p && p<=self.max_p);
+        self.get_x(Some(*self.roots.last().unwrap()), p, self.min_p, self.max_p)
+    }
+    /// 区間のモノイド積を返す関数
+    pub fn prod<T,R>(&self, range: R) -> M::S where T: num::PrimInt, R: std::ops::RangeBounds<T> {
+        if let std::ops::Bound::Excluded(&r)=range.end_bound() {
+            let r=r.to_isize().unwrap();
+            if r==self.min_p {
+                return M::identity();
+            }
+        }
+        if let std::ops::Bound::Excluded(&l)=range.start_bound() {
+            let l=l.to_isize().unwrap();
+            if l==self.max_p {
+                return M::identity();
+            }
+        }
+        let l=match range.start_bound() {
+            std::ops::Bound::Included(&l) => l.to_isize().unwrap(),
+            std::ops::Bound::Excluded(&l) => l.to_isize().unwrap()+1,
+            std::ops::Bound::Unbounded => self.min_p
+        };
+        let r=match range.end_bound() {
+            std::ops::Bound::Included(&r) => r.to_isize().unwrap(),
+            std::ops::Bound::Excluded(&r) => r.to_isize().unwrap()-1,
+            std::ops::Bound::Unbounded => self.max_p
+        };
+        debug_assert!(l<=r && self.min_p<=l && r<=self.max_p);
+        if l==self.min_p && r==self.max_p {
+            self.all_prod()
+        } else {
+            self.get_prod(Some(*self.roots.last().unwrap()), l, r, self.min_p, self.max_p)
+        }
+    }
+    /// 全区間のモノイド積を返す関数
+    pub fn all_prod(&self) -> M::S {
+        self.x(Some(*self.roots.last().unwrap()))
+    }
+    /// 左端を固定したセグ木上の二分探索（fは条件を表す関数）
+    pub fn max_right<T,F>(&self, l: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
+        let l=l.to_isize().unwrap();
+        debug_assert!(self.min_p<=l && l<=self.max_p+1);
+        debug_assert!(f(&M::identity()));
+        if l==self.max_p+1 {
+            return T::from(self.max_p+1).unwrap();
+        }
+        let (offset,node_ind,left,right)=self.get_right_prod(Some(*self.roots.last().unwrap()), l, self.min_p, self.max_p, &f);
+        if node_ind.is_none() {
+            return T::from(self.max_p+1).unwrap();
+        }
+        let ret=self.get_max_right(node_ind, offset, left, right, &f);
+        T::from(ret+1).unwrap()
+    }
+    /// 右端を固定したセグ木上の二分探索（fは条件を表す関数）
+    pub fn min_left<T,F>(&self, r: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
+        let r=r.to_isize().unwrap();
+        debug_assert!(self.min_p<=r && r<=self.max_p+1);
+        debug_assert!(f(&M::identity()));
+        if r==self.min_p {
+            return T::from(self.min_p).unwrap();
+        }
+        let r=r-1;
+        let (offset,node_ind,left,right)=self.get_left_prod(Some(*self.roots.last().unwrap()), r, self.min_p, self.max_p, &f);
+        if node_ind.is_none() {
+            return T::from(self.min_p).unwrap();
+        }
+        let ret=self.get_min_left(node_ind, offset, left, right, &f);
+        T::from(ret).unwrap()
+    }
+    /// 現在のセグ木の番号を返す関数
+    pub fn current_number(&self) -> usize {
+        self.roots.len()-1
+    }
+    /// 指定した番号のセグ木に戻す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
+    pub fn rollback(&mut self, to: usize) {
+        self.nodes.push(PersistentSegtreeNode { x: self.nodes[self.roots[to]].x.clone(), left: self.nodes[self.roots[to]].left, right: self.nodes[self.roots[to]].right });
+        self.roots.push(self.nodes.len()-1);
+    }
+    /// 指定した番号のセグ木におけるpの位置のxを返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn past<T>(&self, number: usize, p: T) -> M::S where T: num::PrimInt {
+        let p=p.to_isize().unwrap();
+        debug_assert!(self.min_p<=p && p<=self.max_p);
+        self.get_x(Some(self.roots[number]), p, self.min_p, self.max_p)
+    }
+    /// 指定した番号のセグ木における区間のモノイド積を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn past_prod<T,R>(&self, number: usize, range: R) -> M::S where T: num::PrimInt, R: std::ops::RangeBounds<T> {
+        if let std::ops::Bound::Excluded(&r)=range.end_bound() {
+            let r=r.to_isize().unwrap();
+            if r==self.min_p {
+                return M::identity();
+            }
+        }
+        if let std::ops::Bound::Excluded(&l)=range.start_bound() {
+            let l=l.to_isize().unwrap();
+            if l==self.max_p {
+                return M::identity();
+            }
+        }
+        let l=match range.start_bound() {
+            std::ops::Bound::Included(&l) => l.to_isize().unwrap(),
+            std::ops::Bound::Excluded(&l) => l.to_isize().unwrap()+1,
+            std::ops::Bound::Unbounded => self.min_p
+        };
+        let r=match range.end_bound() {
+            std::ops::Bound::Included(&r) => r.to_isize().unwrap(),
+            std::ops::Bound::Excluded(&r) => r.to_isize().unwrap()-1,
+            std::ops::Bound::Unbounded => self.max_p
+        };
+        debug_assert!(l<=r && self.min_p<=l && r<=self.max_p);
+        if l==self.min_p && r==self.max_p {
+            self.all_prod()
+        } else {
+            self.get_prod(Some(self.roots[number]), l, r, self.min_p, self.max_p)
+        }
+    }
+    /// 指定した番号のセグ木における全区間のモノイド積を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn past_all_prod(&self, number: usize) -> M::S {
+        self.x(Some(self.roots[number]))
+    }
+    /// 指定した番号のセグ木における左端を固定したセグ木上の二分探索（fは条件を表す関数）（numberはcurrent_number関数の返す番号と同じ）
+    pub fn past_max_right<T,F>(&self, number: usize, l: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
+        let l=l.to_isize().unwrap();
+        debug_assert!(self.min_p<=l && l<=self.max_p+1);
+        debug_assert!(f(&M::identity()));
+        if l==self.max_p+1 {
+            return T::from(self.max_p+1).unwrap();
+        }
+        let (offset,node_ind,left,right)=self.get_right_prod(Some(self.roots[number]), l, self.min_p, self.max_p, &f);
+        if node_ind.is_none() {
+            return T::from(self.max_p+1).unwrap();
+        }
+        let ret=self.get_max_right(node_ind, offset, left, right, &f);
+        T::from(ret+1).unwrap()
+    }
+    /// 指定した番号のセグ木における右端を固定したセグ木上の二分探索（fは条件を表す関数）（numberはcurrent_number関数の返す番号と同じ）
+    pub fn past_min_left<T,F>(&self, number: usize, r: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
+        let r=r.to_isize().unwrap();
+        debug_assert!(self.min_p<=r && r<=self.max_p+1);
+        debug_assert!(f(&M::identity()));
+        if r==self.min_p {
+            return T::from(self.min_p).unwrap();
+        }
+        let r=r-1;
+        let (offset,node_ind,left,right)=self.get_left_prod(Some(self.roots[number]), r, self.min_p, self.max_p, &f);
         if node_ind.is_none() {
             return T::from(self.min_p).unwrap();
         }
