@@ -2,5 +2,4 @@
 - const fn
 
 # 追加したいデータ構造やアルゴリズム
-- 部分永続Union-Find
-- 完全永続Union-Find
+（現状はなし）

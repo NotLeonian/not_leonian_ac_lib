@@ -3808,7 +3808,7 @@ pub struct WeightedDSU {
 impl WeightedDSU {
     /// n頂点の重みつきUnion-Findを初期化する関数
     pub fn new(n: usize) -> Self {
-        WeightedDSU { parents: vec![-1;n], potentials: vec![0;n] }
+        Self { parents: vec![-1;n], potentials: vec![0;n] }
     }
     /// 頂点aの属する連結成分の代表元を返す関数
     pub fn leader(&mut self, a: usize) -> usize {
@@ -3818,7 +3818,7 @@ impl WeightedDSU {
         let leader=self.leader(self.parents[a] as usize);
         self.potentials[a]+=self.potentials[self.parents[a] as usize];
         self.parents[a]=leader as isize;
-        return leader;
+        leader
     }
     /// 頂点a,bが連結かどうかを返す関数
     pub fn same(&mut self, a: usize, b: usize) -> bool {
@@ -3867,17 +3867,17 @@ pub struct DSUWithRollback {
 impl DSUWithRollback {
     /// n頂点のUndo可能Union-Findを初期化する関数
     pub fn new(n: usize) -> Self {
-        DSUWithRollback { parents: vec![-1;n], archives: Vec::new() }
+        Self { parents: vec![-1;n], archives: Vec::new() }
     }
     /// 頂点aの属する連結成分の代表元を返す関数
     pub fn leader(&self, a: usize) -> usize {
         if self.parents[a]<0 {
             return a;
         }
-        return self.leader(self.parents[a] as usize);
+        self.leader(self.parents[a] as usize)
     }
     /// 頂点a,bが連結かどうかを返す関数
-    pub fn same(&mut self, a: usize, b: usize) -> bool {
+    pub fn same(&self, a: usize, b: usize) -> bool {
         self.leader(a)==self.leader(b)
     }
     /// 頂点aと頂点bを結ぶ辺を追加する関数（返り値は元は連結でなかったか）
@@ -3896,7 +3896,7 @@ impl DSUWithRollback {
         true
     }
     /// 頂点aの属する連結成分の頂点数を返す関数
-    pub fn size(&mut self, a: usize) -> usize {
+    pub fn size(&self, a: usize) -> usize {
         let leader=self.leader(a);
         (-self.parents[leader]) as usize
     }
@@ -5364,7 +5364,7 @@ impl<M> PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug 
     pub fn past_all_prod(&self, number: usize) -> M::S {
         self.x(Some(self.roots[number]))
     }
-    /// 指定した番号のセグ木における左端を固定したセグ木上の二分探索（fは条件を表す関数）（numberはcurrent_number関数の返す番号と同じ）
+    /// 左端を固定した指定した番号のセグ木上の二分探索（fは条件を表す関数）（numberはcurrent_number関数の返す番号と同じ）
     pub fn past_max_right<T,F>(&self, number: usize, l: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
         let l=l.to_isize().unwrap();
         debug_assert!(self.min_p<=l && l<=self.max_p+1);
@@ -5379,7 +5379,7 @@ impl<M> PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug 
         let ret=self.get_max_right(node_ind, offset, left, right, &f);
         T::from(ret+1).unwrap()
     }
-    /// 指定した番号のセグ木における右端を固定したセグ木上の二分探索（fは条件を表す関数）（numberはcurrent_number関数の返す番号と同じ）
+    /// 右端を固定した指定した番号のセグ木上の二分探索（fは条件を表す関数）（numberはcurrent_number関数の返す番号と同じ）
     pub fn past_min_left<T,F>(&self, number: usize, r: T, f: F) -> T where T: num::PrimInt, F: Fn(&M::S) -> bool {
         let r=r.to_isize().unwrap();
         debug_assert!(self.min_p<=r && r<=self.max_p+1);
@@ -5558,6 +5558,129 @@ impl LiChaoTree {
         } else {
             T::from(-ret).unwrap()
         }
+    }
+}
+
+/// 部分永続Union-Findの構造体（0-indexed）
+#[derive(Clone, Debug)]
+pub struct PartiallyPersistentDSU {
+    parents: Vec<Vec<(usize,isize)>>,
+    current_number: usize
+}
+
+impl PartiallyPersistentDSU {
+    /// n頂点の部分永続Union-Findを初期化する関数
+    pub fn new(n: usize) -> Self {
+        Self { parents: vec![vec![(0,-1)];n], current_number: 0 }
+    }
+    /// 指定した番号のグラフにおける頂点aの属する連結成分の代表元を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn leader(&self, number: usize, a: usize) -> usize {
+        if number<self.parents[a].last().unwrap().0 {
+            return a;
+        }
+        if self.parents[a].last().unwrap().1<0 {
+            return a;
+        }
+        self.leader(number, self.parents[a].last().unwrap().1 as usize)
+    }
+    /// 指定した番号のグラフにおいて頂点a,bが連結かどうかを返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn same(&self, number: usize, a: usize, b: usize) -> bool {
+        self.leader(number, a)==self.leader(number, b)
+    }
+    /// 頂点aと頂点bを結ぶ辺を追加する関数（返り値は元は連結でなかったか）
+    pub fn merge(&mut self, mut a: usize, mut b: usize) -> bool {
+        a=self.leader(self.current_number, a);
+        b=self.leader(self.current_number, b);
+        self.current_number+=1;
+        if a==b {
+            return false;
+        }
+        if self.parents[a].last().unwrap().1<self.parents[b].last().unwrap().1 {
+            std::mem::swap(&mut a, &mut b);
+        }
+        let size=self.parents[a].last().unwrap().1+self.parents[b].last().unwrap().1;
+        self.parents[b].push((self.current_number, size));
+        self.parents[a].push((self.current_number, b as isize));
+        true
+    }
+    /// 指定した番号のグラフにおける頂点aの属する連結成分の頂点数を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn size(&self, number: usize, a: usize) -> usize {
+        let leader=self.leader(number, a);
+        let ind=usize_binary_search(self.parents[leader].len(), true, |mid| self.parents[leader][mid].0<=number);
+        (-self.parents[leader][ind].1) as usize
+    }
+    /// 現在のグラフの番号を返す関数
+    pub fn current_number(&self) -> usize {
+        self.current_number
+    }
+}
+
+/// 完全永続Union-Findのための永続セグ木の演算の構造体
+struct PersistentDSUOperation;
+
+impl ac_library::Monoid for PersistentDSUOperation {
+    type S = isize;
+    fn identity() -> Self::S {
+        -1
+    }
+    fn binary_operation(a: &Self::S, _b: &Self::S) -> Self::S {
+        *a
+    }
+}
+
+/// 完全永続Union-Findの構造体（0-indexed）
+pub struct FullyPersistentDSU {
+    parents: PersistentSegtree<PersistentDSUOperation>,
+    numbers: Vec<usize>
+}
+
+impl FullyPersistentDSU {
+    /// n頂点の完全永続Union-Findを初期化する関数
+    pub fn new(n: usize) -> Self {
+        let ret=Self { parents: PersistentSegtree::new(0, n-1), numbers: vec![0] };
+        ret
+    }
+    /// 指定した番号のグラフにおける頂点aの属する連結成分の代表元を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn leader(&self, number: usize, a: usize) -> usize {
+        let parent=self.parents.past(self.numbers[number], a);
+        if parent<0 {
+            return a;
+        }
+        self.leader(number, parent as usize)
+    }
+    /// 指定した番号のグラフにおいて頂点a,bが連結かどうかを返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn same(&self, number: usize, a: usize, b: usize) -> bool {
+        self.leader(number, a)==self.leader(number, b)
+    }
+    /// 頂点aと頂点bを結ぶ辺を追加する関数（返り値は元は連結でなかったか）
+    pub fn merge(&mut self, mut a: usize, mut b: usize) -> bool {
+        a=self.leader(self.numbers.len()-1, a);
+        b=self.leader(self.numbers.len()-1, b);
+        if a==b {
+            self.numbers.push(*self.numbers.last().unwrap());
+            return false;
+        }
+        if self.parents.get(a)<self.parents.get(b) {
+            std::mem::swap(&mut a, &mut b);
+        }
+        self.parents.set(b, self.parents.get(a)+self.parents.get(b));
+        self.parents.set(a, b as isize);
+        self.numbers.push(self.parents.current_number());
+        true
+    }
+    /// 指定した番号のグラフにおける頂点aの属する連結成分の頂点数を返す関数（numberはcurrent_number関数の返す番号と同じ）
+    pub fn size(&self, number: usize, a: usize) -> usize {
+        let leader=self.leader(number, a);
+        (-self.parents.past(self.numbers[number], leader)) as usize
+    }
+    /// 現在のグラフの番号を返す関数
+    pub fn current_number(&self) -> usize {
+        self.numbers.len()-1
+    }
+    /// 指定した番号までグラフを戻す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
+    pub fn rollback(&mut self, to: usize) {
+        self.parents.rollback(self.numbers[to]);
+        self.numbers.push(self.parents.current_number());
     }
 }
 
