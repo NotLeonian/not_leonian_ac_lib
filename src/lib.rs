@@ -1,6 +1,6 @@
 //! <https://github.com/NotLeonian/not_leonian_ac_lib>  
 //!   
-//! Copyright (c) 2023 Not_Leonian  
+//! Copyright (c) 2023-2024 Not_Leonian  
 //! Released under the MIT license  
 //! <https://opensource.org/licenses/mit-license.php>  
 
@@ -2413,6 +2413,8 @@ pub trait Primes where Self: Sized {
     fn enumerate_divisors(self) -> Vec<Self>;
     /// 素因数分解をする関数
     fn prime_factorize(self) -> Vec<(Self,Self)>;
+    /// selfのe乗をmで割った余りを返す関数（u128を内部で使用）
+    fn modpow(self, e: Self, m: Self) -> Self;
     /// ルジャンドルの定理でselfの階乗がpで何回割り切れるかを計算する関数
     fn legendre_s_formula(self, p: Self) -> Self;
     /// エラトステネスの篩で素数を列挙する関数
@@ -2491,6 +2493,22 @@ impl Primes for usize {
             pes.push((self,1));
         }
         pes
+    }
+    fn modpow(self, e: Self, m: Self) -> Self {
+        let mut p=self as u128;
+        let mut e=e as u128;
+        let m=m as u128;
+        let mut pow=1;
+        while e>0 {
+            if e%2>0 {
+                pow*=p;
+                pow%=m;
+            }
+            p*=p;
+            p%=m;
+            e/=2;
+        }
+        pow as usize
     }
     fn legendre_s_formula(mut self, p: Self) -> Self {
         let mut e=0;
