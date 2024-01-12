@@ -3547,6 +3547,89 @@ impl<T> PersistentStack<T> where T: Default + Clone {
     }
 }
 
+/// 全方位木DPの関数
+/// （T1が辺の重みの型、T2が頂点の重みの型、T3がマージのモノイドの台の型、T4がDPの値の型、F1がマージする前の関数の型、F2がマージした後の関数の型、Mがマージのモノイドの型）
+pub fn rerooting_dp<T1,T2,T3,T4,F1,F2,M>(n: usize, edge_and_weight: &Vec<Vec<(usize,T1)>>, vertex_weight: Option<&Vec<T2>>, f_edge: F1, f_vertex: F2) -> Vec<T4>
+where T1: Clone, T2: Default + Clone, T3: Copy, T4: Copy, F1: Fn(T4,&T1) -> T3, F2: Fn(T3,&T2) -> T4, M: ac_library::Monoid<S=T3> {
+    let default=f_vertex(M::identity(), &T2::default());
+    let mut dp=vec![Vec::<T4>::new();n];
+    for i in 0..n {
+        dp[i].resize(edge_and_weight[i].len(), default);
+    }
+    let mut parent=vec![0;n];
+    let mut idx=vec![0;n];
+    let mut par_idx=vec![0;n];
+    let mut seen=vec![false;n];
+    seen[0]=true;
+    let mut stack=vec![n,0];
+    while let Some(v)=stack.pop() {
+        if v<n {
+            for i in 0..edge_and_weight[v].len() {
+                let &(u,_)=&edge_and_weight[v][i];
+                if !seen[u] {
+                    seen[u]=true;
+                    parent[u]=v;
+                    idx[u]=i;
+                    stack.push(u+n);
+                    stack.push(u);
+                } else {
+                    par_idx[v]=i;
+                }
+            }
+        } else {
+            let v=v-n;
+            if parent[v]!=v {
+                let mut val=M::identity();
+                for i in 0..edge_and_weight[v].len() {
+                    let &(u,ref w)=&edge_and_weight[v][i];
+                    if parent[u]==v {
+                        val=M::binary_operation(&val, &f_edge(dp[v][i], w));
+                    }
+                }
+                if let Some(ws)=vertex_weight {
+                    dp[parent[v]][idx[v]]=f_vertex(val, &ws[v]);
+                } else {
+                    dp[parent[v]][idx[v]]=f_vertex(val, &T2::default());
+                }
+            }
+        }
+    }
+    let mut seen=vec![false;n];
+    seen[0]=true;
+    let mut queue=std::collections::VecDeque::from([0]);
+    let mut ret=vec![default;n];
+    while let Some(v)=queue.pop_back() {
+        let mut left=vec![M::identity();edge_and_weight[v].len()+1];
+        let mut right=vec![M::identity();edge_and_weight[v].len()+1];
+        for i in 0..edge_and_weight[v].len() {
+            let &(_,ref w)=&edge_and_weight[v][i];
+            left[i+1]=M::binary_operation(&left[i], &f_edge(dp[v][i], w));
+        }
+        for i in (0..edge_and_weight[v].len()).rev() {
+            let &(_,ref w)=&edge_and_weight[v][i];
+            right[i]=M::binary_operation(&f_edge(dp[v][i], w), &right[i+1]);
+        }
+        if let Some(ws)=vertex_weight {
+            ret[v]=f_vertex(left[edge_and_weight[v].len()], &ws[v]);
+        } else {
+            ret[v]=f_vertex(left[edge_and_weight[v].len()], &T2::default());
+        }
+        for i in 0..edge_and_weight[v].len() {
+            let &(u,_)=&edge_and_weight[v][i];
+            if !seen[u] {
+                seen[u]=true;
+                queue.push_front(u);
+                if let Some(ws)=vertex_weight {
+                    dp[u][par_idx[u]]=f_vertex(M::binary_operation(&left[i], &right[i+1]), &ws[v]);
+                } else {
+                    dp[u][par_idx[u]]=f_vertex(M::binary_operation(&left[i], &right[i+1]), &T2::default());
+                }
+            }
+        }
+    }
+    ret
+}
+
 /// 簡易的なハッシュの構造体
 #[derive(Clone, Debug)]
 pub struct Hashes<T> {
