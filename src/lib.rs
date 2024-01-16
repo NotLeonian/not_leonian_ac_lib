@@ -3547,6 +3547,48 @@ impl<T> PersistentStack<T> where T: Default + Clone {
     }
 }
 
+/// 行列式を求めるトレイト
+pub trait Determinant {
+    /// 行列式の型
+    type Output;
+    /// 行列式を求める関数
+    fn determinant(&self) -> Self::Output;
+}
+
+impl<M> Determinant for Vec<Vec<ac_library::StaticModInt<M>>> where M: ac_library::Modulus {
+    type Output = ac_library::StaticModInt<M>;
+    fn determinant(&self) -> Self::Output {
+        let mut matrix=self.clone();
+        let n=matrix.len();
+        let mut ans=ac_library::StaticModInt::<M>::new(1);
+        for i in 0..n {
+            debug_assert_eq!(matrix[i].len(), n);
+            if matrix[i][i]==ac_library::StaticModInt::<M>::new(0) {
+                let mut pivot=false;
+                for j in i+1..n {
+                    if matrix[j][i]!=ac_library::StaticModInt::<M>::new(0) {
+                        pivot=true;
+                        matrix.swap(i, j);
+                        ans*=-1;
+                        break;
+                    }
+                }
+                if !pivot {
+                    return ac_library::StaticModInt::<M>::new(0);
+                }
+            }
+            for j in i+1..n {
+                for k in i+1..n {
+                    matrix[j][k]=matrix[j][k]-matrix[j][i]/matrix[i][i]*matrix[i][k];
+                }
+                matrix[j][i]=ac_library::StaticModInt::<M>::new(0);
+            }
+            ans*=matrix[i][i];
+        }
+        ans
+    }
+}
+
 /// 全方位木DPの関数（T1が辺の重みの型、T2が頂点の重みの型、T3がマージのモノイドの台の型、T4がDPの値の型、
 /// F1がマージする前の関数の型、F2がマージした後の関数の型、F3がマージの関数の型、m_idでマージのモノイドの単位元を指定する）
 pub fn rerooting_dp<T1,T2,T3,T4,F1,F2,F3>(n: usize, edge_and_weight: &Vec<Vec<(usize,T1)>>, vertex_weight: Option<&Vec<T2>>, f_edge: F1, f_vertex: F2, m_id: T3, m_op: F3) -> Vec<T4>
