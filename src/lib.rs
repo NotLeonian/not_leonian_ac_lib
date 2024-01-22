@@ -5901,9 +5901,9 @@ impl ToDecimal for String {
     }
 }
 
-/// 2進法での桁数を求めるトレイト
+/// 2進法で0-indexedでの桁数を求めるトレイト（厳密にはその数以下の最大の2冪の2底logの値）
 pub trait BitDigits {
-    /// 2進法での桁数を求める関数
+    /// 2進法で0-indexedでの桁数を求める関数（厳密にはその数以下の最大の2冪の2底logの値）
     fn bit_digits(self) -> usize;
 }
 
