@@ -349,14 +349,9 @@ pub trait MoveRight where Self: std::ops::Index<usize> {
 
 impl<T> MoveRight for Vec<T> where T: Clone {
     fn move_right(&mut self, m: usize, filled: T) {
-        let n=self.len();
-        self.resize(n+m,filled.clone());
-        for i in (0..n).rev() {
-            self[i+m]=self[i].clone();
-        }
-        for i in 0..m {
-            self[i]=filled.clone();
-        }
+        let mut v=vec![filled.clone();m];
+        v.append(self);
+        *self=v;
     }
 }
 
@@ -4162,7 +4157,7 @@ impl<T> SlopeTrick<T> where T: Default + num::PrimInt + std::ops::AddAssign {
 }
 
 /// NTT素数のベクターで形式的冪級数を扱うトレイト（計算によって次数が変わるものはdegで結果の次数を指定）
-pub trait FPS where Self: Sized {
+pub trait FPS where Self: Sized + std::ops::Index<usize> {
     /// 対応するSparseFPSの型
     type Sparse;
     /// 形式的冪級数の最初のlen項を割り当てる関数
@@ -4225,6 +4220,12 @@ pub trait FPS where Self: Sized {
     fn sparse_fps_div(f: &Self, g: &Self::Sparse, deg: usize) -> Self;
     /// 形式的冪級数の配列を受け取ってその総積を計算し、配列を破壊して最初の要素に総積を代入する関数
     fn fps_prod_merge(fs: &mut Vec<Self>);
+    /// Berlekamp-Masseyアルゴリズムを行う関数
+    fn berlekamp_massey(&self) -> Self;
+    /// Bostan-Moriアルゴリズムを行う関数
+    fn bostan_mori(p: &Self, q: &Self, k: usize) -> Self::Output;
+    /// 線形回帰数列の第n項を求める関数（0-indexed）
+    fn calculate_nth_term(&self, n: usize, berlekamp_massey: &Self) -> Self::Output;
 }
 
 impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
@@ -4499,6 +4500,100 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
                 pq.push((l_deg+r_deg,l_i));
             }
         }
+    }
+    fn berlekamp_massey(&self) -> Self {
+        let n=self.len();
+        let mut b=Self::new();
+        let mut c=Self::new();
+        b.reserve(n+1);
+        c.reserve(n+1);
+        b.push(ac_library::StaticModInt::<M>::new(1));
+        c.push(ac_library::StaticModInt::<M>::new(1));
+        let mut y=ac_library::StaticModInt::<M>::new(1);
+        for ed in 1..=n {
+            let l=c.len();
+            let mut x=ac_library::StaticModInt::<M>::new(0);
+            for i in 0..l {
+                x+=c[i]*self[ed-l+i];
+            }
+            b.push(ac_library::StaticModInt::<M>::new(0));
+            let m=b.len();
+            if x==ac_library::StaticModInt::<M>::new(0) {
+                continue;
+            }
+            let freq=x/y;
+            if l<m {
+                let tmp=c.clone();
+                c.move_right(m-l, ac_library::StaticModInt::<M>::new(0));
+                for i in 0..m {
+                    c[m-1-i]-=freq*b[m-1-i];
+                }
+                b=tmp;
+                y=x;
+            } else {
+                for i in 0..m {
+                    c[l-1-i]-=freq*b[m-1-i];
+                }
+            }
+        }
+        c.reverse();
+        c
+    }
+    fn bostan_mori(p: &Self, q: &Self, k: usize) -> Self::Output {
+        let mut p=p.clone();
+        while let Some(&last)=p.last() {
+            if last==ac_library::StaticModInt::<M>::new(0) {
+                p.pop();
+            } else {
+                break;
+            }
+        }
+        let mut q=q.clone();
+        while let Some(&last)=q.last() {
+            if last==ac_library::StaticModInt::<M>::new(0) {
+                q.pop();
+            } else {
+                break;
+            }
+        }
+        debug_assert!(q.len()>0);
+        let mut low=0;
+        while q[low]==ac_library::StaticModInt::<M>::new(0) {
+            low+=1;
+        }
+        let mut k=k+low;
+        q=q[low..].to_vec();
+        if q.len()==1 {
+            return if k<p.len() {
+                p[k]/q[0]
+            } else {
+                ac_library::StaticModInt::<M>::new(0)
+            };
+        }
+        while k>0 {
+            let mut g=q.clone();
+            for i in (1..g.len()).step_by(2) {
+                g[i]*=-1;
+            }
+            let conv=ac_library::convolution(&p, &g);
+            p.fps_prefix_assign((conv.len()+1-k%2)/2);
+            for i in 0..p.len() {
+                p[i]=conv[i*2+k%2];
+            }
+            let conv=ac_library::convolution(&q, &g);
+            for i in 0..q.len() {
+                q[i]=conv[i*2];
+            }
+            k/=2;
+        }
+        p[0]/q[0]
+    }
+    fn calculate_nth_term(&self, n: usize, berlekamp_massey: &Self) -> Self::Output {
+        if n<self.len() {
+            return self[n];
+        }
+        let p=Self::fps_mul(&self.fps_prefix(berlekamp_massey.len()-1), berlekamp_massey, berlekamp_massey.len().saturating_sub(2));
+        Self::bostan_mori(&p, berlekamp_massey, n)
     }
 }
 
