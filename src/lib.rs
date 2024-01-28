@@ -272,6 +272,134 @@ impl EoutputValOr for usize {
     }
 }
 
+/// 0(加法単位元)を定義するトレイト
+pub trait ZeroElement {
+    /// 0(加法単位元)を返す関数
+    fn zero_element() -> Self;
+}
+
+impl ZeroElement for f32 {
+    fn zero_element() -> Self {
+        0.
+    }
+}
+
+impl ZeroElement for f64 {
+    fn zero_element() -> Self {
+        0.
+    }
+}
+
+impl<M> ZeroElement for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn zero_element() -> Self {
+        Self::new(0)
+    }
+}
+
+impl<I> ZeroElement for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn zero_element() -> Self {
+        Self::new(0)
+    }
+}
+
+macro_rules! zero_element {
+    ($($ty:ty),*) => {
+        $(
+            impl ZeroElement for $ty {
+                fn zero_element() -> Self {
+                    0
+                }
+            }
+        )*
+    }
+}
+
+zero_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+/// 1(乗法単位元)を定義するトレイト
+pub trait OneElement {
+    /// 1(乗法単位元)を返す関数
+    fn one_element() -> Self;
+}
+
+impl<M> OneElement for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn one_element() -> Self {
+        Self::new(1)
+    }
+}
+
+impl<I> OneElement for ac_library::DynamicModInt<I> where I: ac_library::Id {
+    fn one_element() -> Self {
+        Self::new(1)
+    }
+}
+
+impl OneElement for f32 {
+    fn one_element() -> Self {
+        1.
+    }
+}
+
+impl OneElement for f64 {
+    fn one_element() -> Self {
+        1.
+    }
+}
+
+macro_rules! one_element {
+    ($($ty:ty),*) => {
+        $(
+            impl OneElement for $ty {
+                fn one_element() -> Self {
+                    1
+                }
+            }
+        )*
+    }
+}
+
+one_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+/// 最小元を定義するトレイト
+pub trait MinimalElement {
+    /// 最小元を定義する関数
+    fn minimal_element() -> Self;
+}
+
+macro_rules! minimal_element {
+    ($($ty:ty),*) => {
+        $(
+            impl MinimalElement for $ty {
+                fn minimal_element() -> Self {
+                    <$ty>::MIN
+                }
+            }
+        )*
+    }
+}
+
+minimal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
+/// 最大元を定義するトレイト
+pub trait MaximalElement {
+    /// 最大元を定義する関数
+    fn maximal_element() -> Self;
+}
+
+macro_rules! maximal_element {
+    ($($ty:ty),*) => {
+        $(
+            impl MaximalElement for $ty {
+                fn maximal_element() -> Self {
+                    <$ty>::MAX
+                }
+            }
+        )*
+    }
+}
+
+maximal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+
 /// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
 pub trait GetFromLast {
     /// 配列やベクターに末尾から数えたインデックスでアクセスする関数（1-indexedであることに注意）
@@ -486,6 +614,22 @@ macro_rules! do_while {
             }
         }
     };
+}
+
+/// selfとrhsがともにMAXでなければop(self,rhs)を返し、そうでなければMAXを返すトレイト
+pub trait OperateIfNotMax where Self: Sized {
+    /// selfとrhsがともにMAXでなければop(self,rhs)を返し、そうでなければMAXを返す関数
+    fn operate_if_not_max(self, rhs: Self, op: fn(Self,Self) -> Self) -> Self;
+}
+
+impl<T> OperateIfNotMax for T where T: Copy + PartialEq<T> + MaximalElement {
+    fn operate_if_not_max(self, rhs: Self, op: fn(Self,Self) -> Self) -> Self {
+        if self!=Self::maximal_element() && rhs!=Self::maximal_element() {
+            op(self,rhs)
+        } else {
+            Self::maximal_element()
+        }
+    }
 }
 
 /// ModInt998244353を表す型
@@ -747,15 +891,20 @@ impl VecGraph {
     pub fn floyd_warshall(&self) -> Vec<Vec<usize>> {
         let mut dist=vec![vec![usize::MAX;self.size()];self.size()];
         for v in 0..self.size() {
+            dist[v][v]=0;
             for &(u,w) in &self.graph[v] {
                 dist[v][u]=w;
-                dist[u][v]=w;
             }
         }
         for m in 0..self.size() {
             for v in 0..self.size() {
                 for u in 0..self.size() {
-                    dist[v][u]=min(dist[v][m].saturating_add(dist[m][u]), dist[v][u]);
+                    if dist[v][m]<usize::MAX && dist[m][u]<usize::MAX {
+                        let tmp=dist[v][m].saturating_add(dist[m][u]);
+                        if tmp<dist[v][u] {
+                            dist[v][u]=tmp;
+                        }
+                    }
                 }
             }
         }
@@ -1253,15 +1402,20 @@ impl MapGraph {
     pub fn floyd_warshall(&self) -> Vec<Vec<usize>> {
         let mut dist=vec![vec![usize::MAX;self.size()];self.size()];
         for v in 0..self.size() {
+            dist[v][v]=0;
             for (&u,&w) in &self.graph[v] {
                 dist[v][u]=w;
-                dist[u][v]=w;
             }
         }
         for m in 0..self.size() {
             for v in 0..self.size() {
                 for u in 0..self.size() {
-                    dist[v][u]=min(dist[v][m].saturating_add(dist[m][u]), dist[v][u]);
+                    if dist[v][m]<usize::MAX && dist[m][u]<usize::MAX {
+                        let tmp=dist[v][m].saturating_add(dist[m][u]);
+                        if tmp<dist[v][u] {
+                            dist[v][u]=tmp;
+                        }
+                    }
                 }
             }
         }
@@ -1628,6 +1782,29 @@ impl IsizeGraph {
         }
         ret
     }
+    /// ワーシャル・フロイド法の関数（到達不能ならばisize::MAXが入る）（関数内では負の閉路の存在判定を行わないことに注意）
+    pub fn floyd_warshall(&self) -> Vec<Vec<isize>> {
+        let mut dist=vec![vec![isize::MAX;self.size()];self.size()];
+        for v in 0..self.size() {
+            dist[v][v]=0;
+            for &(u,w) in &self.graph[v] {
+                dist[v][u]=w;
+            }
+        }
+        for m in 0..self.size() {
+            for v in 0..self.size() {
+                for u in 0..self.size() {
+                    if dist[v][m]<isize::MAX && dist[m][u]<isize::MAX {
+                        let tmp=dist[v][m].saturating_add(dist[m][u]);
+                        if tmp<dist[v][u] {
+                            dist[v][u]=tmp;
+                        }
+                    }
+                }
+            }
+        }
+        dist
+    }
 }
 
 /// 二分探索の関数（整数）
@@ -1886,86 +2063,6 @@ impl<T> RemovableRevBinaryHeap<T> where T: Ord {
     }
 }
 
-/// 0(加法単位元)を定義するトレイト
-pub trait Zero {
-    /// 0(加法単位元)を返す関数
-    fn zero_val() -> Self;
-}
-
-impl Zero for f32 {
-    fn zero_val() -> Self {
-        0.
-    }
-}
-
-impl Zero for f64 {
-    fn zero_val() -> Self {
-        0.
-    }
-}
-
-impl<M> Zero for ac_library::StaticModInt<M> where M: ac_library::Modulus {
-    fn zero_val() -> Self {
-        Self::new(0)
-    }
-}
-
-impl<I> Zero for ac_library::DynamicModInt<I> where I: ac_library::Id {
-    fn zero_val() -> Self {
-        Self::new(0)
-    }
-}
-
-/// 1(乗法単位元)を定義するトレイト
-pub trait One {
-    /// 1(乗法単位元)を返す関数
-    fn one_val() -> Self;
-}
-
-impl<M> One for ac_library::StaticModInt<M> where M: ac_library::Modulus {
-    fn one_val() -> Self {
-        Self::new(1)
-    }
-}
-
-impl<I> One for ac_library::DynamicModInt<I> where I: ac_library::Id {
-    fn one_val() -> Self {
-        Self::new(1)
-    }
-}
-
-impl One for f32 {
-    fn one_val() -> Self {
-        1.
-    }
-}
-
-impl One for f64 {
-    fn one_val() -> Self {
-        1.
-    }
-}
-
-/// プリミティブな整数型についてZeroとOneトレイトを記述するマクロ
-macro_rules! zero_one {
-    ($($ty:ty),*) => {
-        $(
-            impl Zero for $ty {
-                fn zero_val() -> Self {
-                    0
-                }
-            }
-            impl One for $ty {
-                fn one_val() -> Self {
-                    1
-                }
-            }
-        )*
-    }
-}
-
-zero_one!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
-
 /// ModIntの逆元についてのトレイト
 pub trait ModIntInv where Self: Sized {
     /// ModIntの逆元をベクターで列挙する関数（最初の要素には0が入る）
@@ -2048,9 +2145,9 @@ pub trait PrefixSum {
     fn calculate_partial_sum(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
 }
 
-impl<T> PrefixSum for Vec<T> where T: Clone + Zero + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
+impl<T> PrefixSum for Vec<T> where T: Clone + ZeroElement + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
     fn construct_prefix_sum(&self) -> Self {
-        let mut prefix_sum=vec![T::zero_val();self.len()+1];
+        let mut prefix_sum=vec![T::zero_element();self.len()+1];
         for i in 0..self.len() {
             prefix_sum[i+1]=prefix_sum[i].clone()+self[i].clone();
         }
@@ -2071,9 +2168,9 @@ pub trait TwoDimPrefixSum {
     fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <Self::Output as std::ops::Index<usize>>::Output where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize>;
 }
 
-impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + Zero + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
+impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + ZeroElement + std::ops::Add<Output=T> + std::ops::Sub<Output=T> {
     fn construct_2d_prefix_sum(&self) -> Self {
-        let mut prefix_sum=vec![vec![T::zero_val();self[0].len()+1];self.len()+1];
+        let mut prefix_sum=vec![vec![T::zero_element();self[0].len()+1];self.len()+1];
         for i in 0..self.len() {
             debug_assert_eq!(self[i].len(), self[0].len());
             for j in 0..self[0].len() {
@@ -3033,10 +3130,10 @@ impl<T, const N: usize> VecLCM for [T;N] where T: Copy + num::One + num_integer:
 pub struct Add<S>(std::marker::PhantomData<S>);
 
 /// modintなどで加算を行うモノイドのトレイト
-impl<S> ac_library::Monoid for Add<S> where S: Copy + std::ops::Add<Output=S> + Zero {
+impl<S> ac_library::Monoid for Add<S> where S: Copy + std::ops::Add<Output=S> + ZeroElement {
     type S = S;
     fn identity() -> Self::S {
-        S::zero_val()
+        S::zero_element()
     }
     fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
         *a+*b
@@ -3047,10 +3144,10 @@ impl<S> ac_library::Monoid for Add<S> where S: Copy + std::ops::Add<Output=S> + 
 pub struct Mul<S>(std::marker::PhantomData<S>);
 
 /// modintなどで乗算を行うモノイドのトレイト
-impl<S> ac_library::Monoid for Mul<S> where S: Copy + std::ops::Mul<Output=S> + One {
+impl<S> ac_library::Monoid for Mul<S> where S: Copy + std::ops::Mul<Output=S> + OneElement {
     type S = S;
     fn identity() -> Self::S {
-        S::one_val()
+        S::one_element()
     }
     fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
         *a**b
@@ -3075,11 +3172,11 @@ impl<S> ac_library::Monoid for DummyOperation<S> where S: Default + Clone {
 pub struct SegmentAffineTransform<M>(std::marker::PhantomData<M>);
 
 /// 区間のそれぞれの要素にアフィン変換を行う作用のトレイト
-impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + Zero + One {
+impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + ZeroElement + OneElement {
     type M = M;
     type F = (M::S,M::S);
     fn identity_map() -> Self::F {
-        (M::S::one_val(),<M as ac_library::Monoid>::S::zero_val())
+        (M::S::one_element(),<M as ac_library::Monoid>::S::zero_element())
     }
     fn mapping(f: &Self::F, x: &<Self::M as ac_library::Monoid>::S) -> <Self::M as ac_library::Monoid>::S {
         f.0.clone()*x.clone()+f.1.clone()
@@ -3381,34 +3478,34 @@ impl<T, const N1: usize, const N2: usize> PartialEq for Matrix<T,N1,N2> where T:
     }
 }
 
-impl<T, const N1: usize, const N2: usize> Zero for Matrix<T,N1,N2> where T: Copy + Zero {
-    fn zero_val() -> Self {
-        Self { matrix: [[T::zero_val();N2];N1] }
+impl<T, const N1: usize, const N2: usize> ZeroElement for Matrix<T,N1,N2> where T: Copy + ZeroElement {
+    fn zero_element() -> Self {
+        Self { matrix: [[T::zero_element();N2];N1] }
     }
 }
 
-impl<T, const N1: usize, const N2: usize> num::Zero for Matrix<T,N1,N2> where T: Copy + Zero + std::ops::Add<Output=T> + PartialEq {
+impl<T, const N1: usize, const N2: usize> num::Zero for Matrix<T,N1,N2> where T: Copy + ZeroElement + std::ops::Add<Output=T> + PartialEq {
     fn zero() -> Self {
-        Self::zero_val()
+        Self::zero_element()
     }
     fn is_zero(&self) -> bool {
         *self==Self::zero()
     }
 }
 
-impl<T, const N: usize> One for Matrix<T,N,N> where T: Copy + Zero + One {
-    fn one_val() -> Self {
-        let mut matrix=Self::zero_val();
+impl<T, const N: usize> OneElement for Matrix<T,N,N> where T: Copy + ZeroElement + OneElement {
+    fn one_element() -> Self {
+        let mut matrix=Self::zero_element();
         for i in 0..N {
-            matrix[i][i]=T::one_val();
+            matrix[i][i]=T::one_element();
         }
         matrix
     }
 }
 
-impl<T, const N: usize> num::One for Matrix<T,N,N> where T: Copy + Zero + One + std::ops::AddAssign + std::ops::Mul<Output=T> + PartialEq {
+impl<T, const N: usize> num::One for Matrix<T,N,N> where T: Copy + ZeroElement + OneElement + std::ops::AddAssign + std::ops::Mul<Output=T> + PartialEq {
     fn one() -> Self {
-        Self::one_val()
+        Self::one_element()
     }
     fn is_one(&self) -> bool {
         *self==Self::one()
@@ -3471,16 +3568,16 @@ impl<T, const N1: usize, const N2: usize> std::ops::Sub for Matrix<T,N1,N2> wher
     }
 }
 
-impl<T, const N: usize> std::ops::MulAssign for Matrix<T,N,N> where T: Copy + Zero + std::ops::AddAssign + std::ops::Mul<Output=T> {
+impl<T, const N: usize> std::ops::MulAssign for Matrix<T,N,N> where T: Copy + ZeroElement + std::ops::AddAssign + std::ops::Mul<Output=T> {
     fn mul_assign(&mut self, rhs: Self) {
         *self=self.clone()*rhs;
     }
 }
 
-impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<T,N2,N3>> for Matrix<T,N1,N2> where T: Copy + Zero + std::ops::AddAssign + std::ops::Mul<Output=T> {
+impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<T,N2,N3>> for Matrix<T,N1,N2> where T: Copy + ZeroElement + std::ops::AddAssign + std::ops::Mul<Output=T> {
     type Output = Matrix<T,N1,N3>;
     fn mul(self, rhs: Matrix<T,N2,N3>) -> Self::Output {
-        let mut prod=Self::Output::zero_val();
+        let mut prod=Self::Output::zero_element();
         for i in 0..N1 {
             for j in 0..N3 {
                 for k in 0..N2 {
