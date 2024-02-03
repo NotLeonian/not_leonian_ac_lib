@@ -970,8 +970,8 @@ impl VecGraph {
         for i in 0..wvu.len() {
             let (w,v,u)=wvu[i];
             if !uf.same(v, u) {
-                ret.get_mut()[v].push((u,w));
-                ret.get_mut()[u].push((v,w));
+                ret.graph[v].push((u,w));
+                ret.graph[u].push((v,w));
                 edge_cnt+=1;
                 uf.merge(v, u);
             }
@@ -997,8 +997,8 @@ impl VecGraph {
                 if ok[u] {
                     continue;
                 }
-                ret.get_mut()[v].push((u,w));
-                ret.get_mut()[u].push((v,w));
+                ret.graph[v].push((u,w));
+                ret.graph[u].push((v,w));
                 edge_cnt+=1;
                 ok[u]=true;
                 for &(t,w) in &self.graph[u] {
@@ -1022,8 +1022,8 @@ impl VecGraph {
                 if ok[u] {
                     continue;
                 }
-                ret.get_mut()[v].push((u,w));
-                ret.get_mut()[u].push((v,w));
+                ret.graph[v].push((u,w));
+                ret.graph[u].push((v,w));
                 edge_cnt+=1;
                 ok[u]=true;
                 for &(t,w) in &self.graph[u] {
@@ -1055,11 +1055,14 @@ impl VecGraph {
         let n=self.size();
         let mut ord=vec![n;n];
         let mut low=vec![n;n];
-        let mut parent=vec![n;n];
+        let mut par=vec![0;n];
         let mut stack=Vec::<usize>::new();
         let mut cnt=0;
         for i in 0..n {
-            stack.push(i);
+            if ord[i]==n {
+                stack.push(i);
+                par[i]=i;
+            }
             while let Some(v)=stack.pop() {
                 if v<n {
                     if ord[v]<n {
@@ -1070,48 +1073,120 @@ impl VecGraph {
                     cnt+=1;
                     for &(u,_) in &self.graph[v] {
                         if ord[u]==n {
-                            parent[u]=v;
+                            par[u]=v;
                             stack.push(u+n);
                             stack.push(u);
-                        } else if parent[v]!=u && ord[u]<low[v] {
+                        } else if par[v]!=u && ord[u]<low[v] {
                             low[v]=ord[u];
                         }
                     }
                 } else {
                     let v=v-n;
-                    if low[v]<low[parent[v]] {
-                        low[parent[v]]=low[v];
+                    if low[v]<low[par[v]] {
+                        low[par[v]]=low[v];
                     }
                 }
             }
         }
-        (ord,low,parent)
+        (ord,low,par)
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aが関節点であるか判定する関数
-    pub fn is_articulation_point(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
-        if parent[a]==self.size() {
-            self.graph[a].iter().filter(|&&(b,_)| parent[b]==a).count()>1
+    /// lowlinkの結果ordとlowおよびparをもとに、頂点aが関節点であるか判定する関数
+    pub fn is_articulation_point(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, par: &Vec<usize>) -> bool {
+        if par[a]==a {
+            self.graph[a].iter().filter(|&&(b,_)| a!=b && par[b]==a).count()>1
         } else {
-            self.graph[a].iter().any(|&(b,_)| parent[b]==a && ord[a]<=low[b])
+            self.graph[a].iter().any(|&(b,_)| par[b]==a && ord[a]<=low[b])
         }
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
-    pub fn is_bridge(&self, a: usize, b: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
-        if parent[b]==a {
+    /// lowlinkの結果ordとlowおよびparをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
+    pub fn is_bridge(&self, a: usize, b: usize, ord: &Vec<usize>, low: &Vec<usize>, par: &Vec<usize>) -> bool {
+        if par[b]==a {
             ord[a]<low[b]
-        } else if parent[a]==b {
+        } else if par[a]==b {
             ord[b]<low[a]
         } else {
             false
         }
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aを削除した後の連結成分の個数を返す関数（元から頂点aを含んでいない連結成分は考慮されないことに注意）
-    pub fn number_of_connected_components_after_removing(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
-        if parent[a]==self.size() {
-            self.graph[a].iter().filter(|&&(b,_)| parent[b]==a).count()
+    /// lowlinkの結果ordとlowおよびparをもとに、頂点aを削除した後の連結成分の個数を返す関数（元から頂点aを含んでいない連結成分は考慮されないことに注意）
+    pub fn number_of_connected_components_after_removing(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, par: &Vec<usize>) -> usize {
+        if par[a]==a {
+            self.graph[a].iter().filter(|&&(b,_)| a!=b && par[b]==a).count()
         } else {
-            self.graph[a].iter().filter(|&&(b,_)| parent[b]==a && ord[a]<=low[b]).count()+1
+            self.graph[a].iter().filter(|&&(b,_)| par[b]==a && ord[a]<=low[b]).count()+1
         }
+    }
+    /// Easiest HLDとオイラーツアーを行い、隣接リストの各1要素目をHeavy Edgeにするとともに、
+    /// 順に行きがけ順の番号と、DFS木上の親の頂点番号と、DFS木上の頂点の深さと、Heavy Pathの始点の頂点番号と、
+    /// オイラーツアーの訪問順の列と、頂点に入ったときの番号と、頂点から出たときの番号を返す関数
+    pub fn easiest_hld_and_euler_tour(&mut self) -> (Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>) {
+        let n=self.size();
+        let mut sizes=vec![0;n];
+        let mut seen=vec![false;n];
+        seen[0]=true;
+        let mut stack=vec![n,0];
+        while let Some(v)=stack.pop() {
+            if v<n {
+                for &(u,_) in &self.graph[v] {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+n);
+                        stack.push(u);
+                    }
+                }
+            } else {
+                let v=v-n;
+                sizes[v]=1;
+                for i in 0..self.graph[v].len() {
+                    let u=self.graph[v][i].0;
+                    sizes[v]+=sizes[u];
+                    if sizes[u]>sizes[self.graph[v][0].0] {
+                        self.graph[v].swap(i, 0);
+                    }
+                }
+            }
+        }
+        let mut ord=vec![0;n];
+        let mut par=vec![0;n];
+        let mut depth=vec![0;n];
+        let mut initial=vec![0;n];
+        let mut tour=vec![0;2*n];
+        let mut in_idx=vec![0;n];
+        let mut out_idx=vec![0;n];
+        let mut cnt=0;
+        let mut idx=0;
+        let mut seen=vec![false;n];
+        seen[0]=true;
+        let mut stack=vec![n,0];
+        while let Some(v)=stack.pop() {
+            if v<n {
+                ord[v]=cnt;
+                cnt+=1;
+                tour[idx]=v;
+                in_idx[v]=idx;
+                idx+=1;
+                for &(u,_) in self.graph[v].iter().rev() {
+                    if !seen[u] {
+                        seen[u]=true;
+                        par[u]=v;
+                        depth[u]=depth[v]+1;
+                        initial[u]=if u==self.graph[v][0].0 {
+                            initial[v]
+                        } else {
+                            u
+                        };
+                        stack.push(u+n);
+                        stack.push(u);
+                    }
+                }
+            } else {
+                tour[idx]=v;
+                let v=v-n;
+                out_idx[v]=idx;
+                idx+=1;
+            }
+        }
+        (ord,par,depth,initial,tour,in_idx,out_idx)
     }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
     pub fn pruefer_code(&self) -> Vec<usize> {
@@ -1481,8 +1556,8 @@ impl MapGraph {
         for i in 0..wvu.len() {
             let (w,v,u)=wvu[i];
             if !uf.same(v, u) {
-                ret.get_mut()[v].insert(u,w);
-                ret.get_mut()[u].insert(v,w);
+                ret.graph[v].insert(u,w);
+                ret.graph[u].insert(v,w);
                 edge_cnt+=1;
                 uf.merge(v, u);
             }
@@ -1508,8 +1583,8 @@ impl MapGraph {
                 if ok[u] {
                     continue;
                 }
-                ret.get_mut()[v].insert(u,w);
-                ret.get_mut()[u].insert(v,w);
+                ret.graph[v].insert(u,w);
+                ret.graph[u].insert(v,w);
                 edge_cnt+=1;
                 ok[u]=true;
                 for (&t,&w) in &self.graph[u] {
@@ -1533,8 +1608,8 @@ impl MapGraph {
                 if ok[u] {
                     continue;
                 }
-                ret.get_mut()[v].insert(u,w);
-                ret.get_mut()[u].insert(v,w);
+                ret.graph[v].insert(u,w);
+                ret.graph[u].insert(v,w);
                 edge_cnt+=1;
                 ok[u]=true;
                 for (&t,&w) in &self.graph[u] {
@@ -1566,11 +1641,14 @@ impl MapGraph {
         let n=self.size();
         let mut ord=vec![n;n];
         let mut low=vec![n;n];
-        let mut parent=vec![n;n];
+        let mut par=vec![0;n];
         let mut stack=Vec::<usize>::new();
         let mut cnt=0;
         for i in 0..n {
-            stack.push(i);
+            if ord[i]==n {
+                stack.push(i);
+                par[i]=i;
+            }
             while let Some(v)=stack.pop() {
                 if v<n {
                     if ord[v]<n {
@@ -1581,47 +1659,47 @@ impl MapGraph {
                     cnt+=1;
                     for (&u,_) in &self.graph[v] {
                         if ord[u]==n {
-                            parent[u]=v;
+                            par[u]=v;
                             stack.push(u+n);
                             stack.push(u);
-                        } else if parent[v]!=u && ord[u]<low[v] {
+                        } else if par[v]!=u && ord[u]<low[v] {
                             low[v]=ord[u];
                         }
                     }
                 } else {
                     let v=v-n;
-                    if low[v]<low[parent[v]] {
-                        low[parent[v]]=low[v];
+                    if low[v]<low[par[v]] {
+                        low[par[v]]=low[v];
                     }
                 }
             }
         }
-        (ord,low,parent)
+        (ord,low,par)
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aが関節点であるか判定する関数
-    pub fn is_articulation_point(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
-        if parent[a]==self.size() {
-            self.graph[a].iter().filter(|&(&b,_)| parent[b]==a).count()>1
+    /// lowlinkの結果ordとlowおよびparをもとに、頂点aが関節点であるか判定する関数
+    pub fn is_articulation_point(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, par: &Vec<usize>) -> bool {
+        if par[a]==a {
+            self.graph[a].iter().filter(|&(&b,_)| a!=b && par[b]==a).count()>1
         } else {
-            self.graph[a].iter().any(|(&b,_)| parent[b]==a && ord[a]<=low[b])
+            self.graph[a].iter().any(|(&b,_)| par[b]==a && ord[a]<=low[b])
         }
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
-    pub fn is_bridge(&self, a: usize, b: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> bool {
-        if parent[b]==a {
+    /// lowlinkの結果ordとlowおよびparをもとに、頂点aと頂点bを結ぶ辺が橋であるかを判定する関数
+    pub fn is_bridge(&self, a: usize, b: usize, ord: &Vec<usize>, low: &Vec<usize>, par: &Vec<usize>) -> bool {
+        if par[b]==a {
             ord[a]<low[b]
-        } else if parent[a]==b {
+        } else if par[a]==b {
             ord[b]<low[a]
         } else {
             false
         }
     }
-    /// lowlinkの結果ordとlowおよびparentをもとに、頂点aを削除した後の連結成分の個数を返す関数（元から頂点aを含んでいない連結成分は考慮されないことに注意）
-    pub fn number_of_connected_components_after_removing(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, parent: &Vec<usize>) -> usize {
-        if parent[a]==self.size() {
-            self.graph[a].iter().filter(|&(&b,_)| parent[b]==a).count()
+    /// lowlinkの結果ordとlowおよびparをもとに、頂点aを削除した後の連結成分の個数を返す関数（元から頂点aを含んでいない連結成分は考慮されないことに注意）
+    pub fn number_of_connected_components_after_removing(&self, a: usize, ord: &Vec<usize>, low: &Vec<usize>, par: &Vec<usize>) -> usize {
+        if par[a]==a {
+            self.graph[a].iter().filter(|&(&b,_)| a!=b && par[b]==a).count()
         } else {
-            self.graph[a].iter().filter(|&(&b,_)| parent[b]==a && ord[a]<=low[b]).count()+1
+            self.graph[a].iter().filter(|&(&b,_)| par[b]==a && ord[a]<=low[b]).count()+1
         }
     }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
@@ -3690,7 +3768,7 @@ where T1: Clone, T2: Default + Clone, T3: Copy, T4: Copy, F1: Fn(T4,&T1) -> T3, 
     for i in 0..n {
         dp[i].resize(edge_and_weight[i].len(), default);
     }
-    let mut parent=vec![0;n];
+    let mut par=vec![0;n];
     let mut idx=vec![0;n];
     let mut par_idx=vec![0;n];
     let mut seen=vec![false;n];
@@ -3702,7 +3780,7 @@ where T1: Clone, T2: Default + Clone, T3: Copy, T4: Copy, F1: Fn(T4,&T1) -> T3, 
                 let &(u,_)=&edge_and_weight[v][i];
                 if !seen[u] {
                     seen[u]=true;
-                    parent[u]=v;
+                    par[u]=v;
                     idx[u]=i;
                     stack.push(u+n);
                     stack.push(u);
@@ -3712,18 +3790,18 @@ where T1: Clone, T2: Default + Clone, T3: Copy, T4: Copy, F1: Fn(T4,&T1) -> T3, 
             }
         } else {
             let v=v-n;
-            if parent[v]!=v {
+            if par[v]!=v {
                 let mut val=m_id;
                 for i in 0..edge_and_weight[v].len() {
                     let &(u,ref w)=&edge_and_weight[v][i];
-                    if parent[u]==v {
+                    if par[u]==v {
                         val=m_op(val, f_edge(dp[v][i], w));
                     }
                 }
                 if let Some(ws)=vertex_weight {
-                    dp[parent[v]][idx[v]]=f_vertex(val, &ws[v]);
+                    dp[par[v]][idx[v]]=f_vertex(val, &ws[v]);
                 } else {
-                    dp[parent[v]][idx[v]]=f_vertex(val, &T2::default());
+                    dp[par[v]][idx[v]]=f_vertex(val, &T2::default());
                 }
             }
         }
@@ -4030,6 +4108,56 @@ impl Doubling for Vec<Vec<usize>> {
             k+=1;
         }
         start
+    }
+}
+
+/// LCAを求めるセグ木の法
+const LCA_MOD:usize=998244353;
+
+/// LCAを求めるセグ木のモノイドの構造体
+pub struct LCAMonoid;
+
+impl ac_library::Monoid for LCAMonoid {
+    type S = usize;
+    fn identity() -> Self::S {
+        LCA_MOD*LCA_MOD-1
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        if a%LCA_MOD<b%LCA_MOD {
+            *a
+        } else if a%LCA_MOD>b%LCA_MOD {
+            *b
+        } else {
+            min(*a, *b)
+        }
+    }
+}
+
+/// LCAを求めるセグ木の型
+pub type LCA=ac_library::Segtree<LCAMonoid>;
+
+/// LCAを求めるセグ木
+pub trait LCASegtree {
+    /// LCAを求めるセグ木を構築する関数
+    fn construct_lca_segtree(n: usize, par: &Vec<usize>, depth: &Vec<usize>, in_idx: &Vec<usize>, out_idx: &Vec<usize>) -> Self;
+    /// 頂点aと頂点bのLCAを返す関数
+    fn lca(&self, a: usize, b: usize, in_idx: &Vec<usize>) -> usize;
+}
+
+impl LCASegtree for ac_library::Segtree<LCAMonoid> {
+    fn construct_lca_segtree(n: usize, par: &Vec<usize>, depth: &Vec<usize>, in_idx: &Vec<usize>, out_idx: &Vec<usize>) -> Self {
+        let mut st=Self::new(2*n);
+        for v in 0..n {
+            st.set(in_idx[v], v*LCA_MOD+depth[v]);
+            st.set(out_idx[v], par[v]*LCA_MOD+depth[par[v]]);
+        }
+        st
+    }
+    fn lca(&self, mut a: usize, mut b: usize, in_idx: &Vec<usize>) -> usize {
+        if in_idx[a]>in_idx[b] {
+            std::mem::swap(&mut a, &mut b);
+        }
+        self.prod(in_idx[a]..=in_idx[b])/LCA_MOD
     }
 }
 
