@@ -4111,25 +4111,16 @@ impl Doubling for Vec<Vec<usize>> {
     }
 }
 
-/// LCAを求めるセグ木の法
-const LCA_MOD:usize=998244353;
-
 /// LCAを求めるセグ木のモノイドの構造体
 pub struct LCAMonoid;
 
 impl ac_library::Monoid for LCAMonoid {
-    type S = usize;
+    type S = (usize,usize);
     fn identity() -> Self::S {
-        LCA_MOD*LCA_MOD-1
+        (usize::MAX,usize::MAX)
     }
     fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
-        if a%LCA_MOD<b%LCA_MOD {
-            *a
-        } else if a%LCA_MOD>b%LCA_MOD {
-            *b
-        } else {
-            min(*a, *b)
-        }
+        min(*a, *b)
     }
 }
 
@@ -4148,8 +4139,8 @@ impl LCASegtree for ac_library::Segtree<LCAMonoid> {
     fn construct_lca_segtree(n: usize, par: &Vec<usize>, depth: &Vec<usize>, in_idx: &Vec<usize>, out_idx: &Vec<usize>) -> Self {
         let mut st=Self::new(2*n);
         for v in 0..n {
-            st.set(in_idx[v], v*LCA_MOD+depth[v]);
-            st.set(out_idx[v], par[v]*LCA_MOD+depth[par[v]]);
+            st.set(in_idx[v], (depth[v],v));
+            st.set(out_idx[v], (depth[par[v]],par[v]));
         }
         st
     }
@@ -4157,7 +4148,7 @@ impl LCASegtree for ac_library::Segtree<LCAMonoid> {
         if in_idx[a]>in_idx[b] {
             std::mem::swap(&mut a, &mut b);
         }
-        self.prod(in_idx[a]..=in_idx[b])/LCA_MOD
+        self.prod(in_idx[a]..=in_idx[b]).1
     }
 }
 
