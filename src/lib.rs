@@ -1430,10 +1430,8 @@ impl MapGraph {
     }
     /// 頂点aから頂点bへの辺があるかどうかを判定し、辺があれば重みを返す関数（返り値はOption）
     pub fn weight(&self, a: usize, b: usize) -> Option<usize> {
-        for (&u,&w) in &self.graph[a] {
-            if u==b {
-                return Some(w);
-            }
+        if let Some(&w)=self.graph[a].get(&b) {
+            return Some(w);
         }
         None
     }
@@ -5809,7 +5807,7 @@ impl<M> PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug 
         };
         debug_assert!(l<=r && self.min_p<=l && r<=self.max_p);
         if l==self.min_p && r==self.max_p {
-            self.all_prod()
+            self.past_all_prod(number)
         } else {
             self.get_prod(Some(self.roots[number]), l, r, self.min_p, self.max_p)
         }
