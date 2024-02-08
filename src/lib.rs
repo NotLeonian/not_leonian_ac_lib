@@ -1219,6 +1219,76 @@ impl VecGraph {
         }
         pc
     }
+    /// 頂点の彩色数を求める関数（頂点数は31以下を想定）
+    pub fn chromatic_number(&self) -> usize {
+        let n=self.size();
+        let mut e=vec![(1<<n)-1;n-1];
+        let mut is_isolated=true;
+        for v in 0..n-1 {
+            if self.graph[v].len()>0 {
+                is_isolated=false;
+            }
+            for &(u,_) in &self.graph[v] {
+                e[v]-=1<<u;
+            }
+        }
+        if is_isolated {
+            return 1;
+        }
+        let mut a=vec![1;1<<(n-1)];
+        let mut t=vec![1;1<<(n-1)];
+        for v in 0..n-1 {
+            for s in 0..1<<v {
+                a[s|(1<<v)]=a[s]+a[s&e[v]];
+                t[s|(1<<v)]=t[s]+if e[v]>>(n-1)>0 {
+                    t[s&e[v]]
+                } else {
+                    0usize
+                };
+            }
+        }
+        for k in 1..n {
+            let d=1<<(k-1);
+            let mut p=vec![0;k+2];
+            let mut q=vec![0;k+2];
+            for r in (0..1<<(n-1)).step_by(1<<k) {
+                let a1=a[r];
+                let a2=a[r+d];
+                let mut digit1=0;
+                let mut digit2=0;
+                for s in r..r+k {
+                    digit1+=t[s+d]*a2;
+                    digit2+=t[s]*a1;
+                    t[s]=(digit1-digit2)&((1<<32)-1);
+                    if (digit1<<32)<(digit2<<32) {
+                        digit2+=1<<32;
+                    }
+                    digit1>>=32;
+                    digit2>>=32;
+                }
+                t[r+k]=(digit1-digit2)&((1<<32)-1);
+                if r.count_ones()%2>0 {
+                    for s in 0..=k {
+                        q[s]+=t[r+s];
+                    }
+                } else {
+                    for s in 0..=k {
+                        p[s]+=t[r+s];
+                    }
+                }
+            }
+            for s in 0..=k {
+                p[s+1]+=p[s]>>32;
+                p[s]-=p[s]>>32<<32;
+                q[s+1]+=q[s]>>32;
+                q[s]-=q[s]>>32<<32;
+            }
+            if p!=q {
+                return k+1;
+            }
+        }
+        unreachable!();
+    }
 }
 
 /// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
@@ -1730,6 +1800,76 @@ impl MapGraph {
             }
         }
         pc
+    }
+    /// 頂点の彩色数を求める関数（頂点数は31以下を想定）
+    pub fn chromatic_number(&self) -> usize {
+        let n=self.size();
+        let mut e=vec![(1<<n)-1;n-1];
+        let mut is_isolated=true;
+        for v in 0..n-1 {
+            if self.graph[v].len()>0 {
+                is_isolated=false;
+            }
+            for (&u,_) in &self.graph[v] {
+                e[v]-=1<<u;
+            }
+        }
+        if is_isolated {
+            return 1;
+        }
+        let mut a=vec![1;1<<(n-1)];
+        let mut t=vec![1;1<<(n-1)];
+        for v in 0..n-1 {
+            for s in 0..1<<v {
+                a[s|(1<<v)]=a[s]+a[s&e[v]];
+                t[s|(1<<v)]=t[s]+if e[v]>>(n-1)>0 {
+                    t[s&e[v]]
+                } else {
+                    0usize
+                };
+            }
+        }
+        for k in 1..n {
+            let d=1<<(k-1);
+            let mut p=vec![0;k+2];
+            let mut q=vec![0;k+2];
+            for r in (0..1<<(n-1)).step_by(1<<k) {
+                let a1=a[r];
+                let a2=a[r+d];
+                let mut digit1=0;
+                let mut digit2=0;
+                for s in r..r+k {
+                    digit1+=t[s+d]*a2;
+                    digit2+=t[s]*a1;
+                    t[s]=(digit1-digit2)&((1<<32)-1);
+                    if (digit1<<32)<(digit2<<32) {
+                        digit2+=1<<32;
+                    }
+                    digit1>>=32;
+                    digit2>>=32;
+                }
+                t[r+k]=(digit1-digit2)&((1<<32)-1);
+                if r.count_ones()%2>0 {
+                    for s in 0..=k {
+                        q[s]+=t[r+s];
+                    }
+                } else {
+                    for s in 0..=k {
+                        p[s]+=t[r+s];
+                    }
+                }
+            }
+            for s in 0..=k {
+                p[s+1]+=p[s]>>32;
+                p[s]-=p[s]>>32<<32;
+                q[s+1]+=q[s]>>32;
+                q[s]-=q[s]>>32<<32;
+            }
+            if p!=q {
+                return k+1;
+            }
+        }
+        unreachable!();
     }
 }
 
@@ -5148,7 +5288,7 @@ impl<T> ZetaMobius for Vec<T> where T: Clone + std::ops::Add<Output=T> + std::op
 struct DynamicSegtreeNode<M> where M: ac_library::Monoid {
     x: M::S,
     left: Option<usize>,
-    right: Option<usize>,
+    right: Option<usize>
 }
 
 /// 動的セグ木の構造体
@@ -5231,11 +5371,11 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
         }
     }
     /// 再帰的に区間のモノイド積を返す関数
-    fn get_prod(&self, node_ind: Option<usize>, x_l: isize, x_r: isize, l: isize, r: isize) -> M::S {
+    fn get_prod(&self, node_ind: Option<usize>, p_l: isize, p_r: isize, l: isize, r: isize) -> M::S {
         if node_ind.is_none() {
             return M::identity();
         }
-        if x_l==l && x_r==r {
+        if p_l==l && p_r==r {
             return self.x(node_ind).clone();
         }
         let ind=node_ind.unwrap();
@@ -5243,12 +5383,12 @@ impl<M> DynamicSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug {
         if m==r {
             m-=1;
         }
-        if x_r<=m {
-            self.get_prod(self.nodes[ind].left, x_l, x_r, l, m)
-        } else if x_l>m {
-            self.get_prod(self.nodes[ind].right, x_l, x_r, m+1, r)
+        if p_r<=m {
+            self.get_prod(self.nodes[ind].left, p_l, p_r, l, m)
+        } else if p_l>m {
+            self.get_prod(self.nodes[ind].right, p_l, p_r, m+1, r)
         } else {
-            M::binary_operation(&self.get_prod(self.nodes[ind].left, x_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, x_r, m+1, r))
+            M::binary_operation(&self.get_prod(self.nodes[ind].left, p_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, p_r, m+1, r))
         }
     }
     /// 再帰的に右端からのモノイド積と条件fを満たさない左端を返す関数
@@ -5545,11 +5685,11 @@ impl<M> PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug 
         }
     }
     /// 再帰的に区間のモノイド積を返す関数
-    fn get_prod(&self, node_ind: Option<usize>, x_l: isize, x_r: isize, l: isize, r: isize) -> M::S {
+    fn get_prod(&self, node_ind: Option<usize>, p_l: isize, p_r: isize, l: isize, r: isize) -> M::S {
         if node_ind.is_none() {
             return M::identity();
         }
-        if x_l==l && x_r==r {
+        if p_l==l && p_r==r {
             return self.x(node_ind).clone();
         }
         let ind=node_ind.unwrap();
@@ -5557,12 +5697,12 @@ impl<M> PersistentSegtree<M> where M: ac_library::Monoid, M::S: std::fmt::Debug 
         if m==r {
             m-=1;
         }
-        if x_r<=m {
-            self.get_prod(self.nodes[ind].left, x_l, x_r, l, m)
-        } else if x_l>m {
-            self.get_prod(self.nodes[ind].right, x_l, x_r, m+1, r)
+        if p_r<=m {
+            self.get_prod(self.nodes[ind].left, p_l, p_r, l, m)
+        } else if p_l>m {
+            self.get_prod(self.nodes[ind].right, p_l, p_r, m+1, r)
         } else {
-            M::binary_operation(&self.get_prod(self.nodes[ind].left, x_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, x_r, m+1, r))
+            M::binary_operation(&self.get_prod(self.nodes[ind].left, p_l, m, l, m), &self.get_prod(self.nodes[ind].right, m+1, p_r, m+1, r))
         }
     }
     /// 再帰的に右端からのモノイド積と条件fを満たさない左端を返す関数
