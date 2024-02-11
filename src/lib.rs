@@ -1188,6 +1188,35 @@ impl VecGraph {
         }
         (ord,par,depth,initial,tour,in_idx,out_idx)
     }
+    /// 頂点集合とオイラーツアーの頂点に入ったときの番号とLCAからAuxiliary Treeを生成し、
+    /// 元の頂点集合を破壊してAuxiliary Treeの頂点集合に変更するとともに、各頂点の隣接リストと親を返す関数
+    /// （返り値の頂点番号は頂点集合の順序に合わせて振り直していることに注意）
+    pub fn auxiliary_tree(&self, vertex_set: &mut Vec<usize>, in_idx: &Vec<usize>, out_idx: &Vec<usize>, lca: &LCA) -> (Vec<Vec<usize>>,Vec<usize>) {
+        vertex_set.sort_by(|&l,&r| in_idx[l].cmp(&in_idx[r]));
+        vertex_set.reserve(vertex_set.len()-1);
+        for i in 0..vertex_set.len()-1 {
+            vertex_set.push(lca.lca(vertex_set[i], vertex_set[i+1], in_idx));
+        }
+        vertex_set.sort_by(|&l,&r| in_idx[l].cmp(&in_idx[r]));
+        vertex_set.dedup();
+        let mut list=vec![Vec::new();vertex_set.len()];
+        let mut par=vec![0;vertex_set.len()];
+        let mut stack=vec![0];
+        for i in 1..vertex_set.len() {
+            while let Some(&j)=stack.last() {
+                if out_idx[vertex_set[j]]<in_idx[vertex_set[i]] {
+                    stack.pop();
+                } else {
+                    par[i]=j;
+                    list[j].push(i);
+                    list[i].push(j);
+                    stack.push(i);
+                    break;
+                }
+            }
+        }
+        (list,par)
+    }
     /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
     pub fn pruefer_code(&self) -> Vec<usize> {
         let n=self.size();
