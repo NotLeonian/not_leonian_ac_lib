@@ -3414,10 +3414,10 @@ impl<S> ac_library::Monoid for DummyOperation<S> where S: Default + Clone {
 }
 
 /// 区間のそれぞれの要素にアフィン変換を行う作用の構造体
-pub struct SegmentAffineTransform<M>(std::marker::PhantomData<M>);
+pub struct RangeAffineTransform<M>(std::marker::PhantomData<M>);
 
 /// 区間のそれぞれの要素にアフィン変換を行う作用のトレイト
-impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + ZeroElement + OneElement {
+impl<M> ac_library::MapMonoid for RangeAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + ZeroElement + OneElement {
     type M = M;
     type F = (M::S,M::S);
     fn identity_map() -> Self::F {
@@ -3425,6 +3425,62 @@ impl<M> ac_library::MapMonoid for SegmentAffineTransform<M> where M: ac_library:
     }
     fn mapping(f: &Self::F, x: &<Self::M as ac_library::Monoid>::S) -> <Self::M as ac_library::Monoid>::S {
         f.0.clone()*x.clone()+f.1.clone()
+    }
+    fn composition(f: &Self::F, g: &Self::F) -> Self::F {
+        (f.0.clone()*g.0.clone(),f.0.clone()*g.1.clone()+f.1.clone())
+    }
+}
+
+/// 区間の長さを合わせてもつモノイドの構造体
+pub struct MonoidWithLength<M>(std::marker::PhantomData<M>);
+
+/// 区間の長さを合わせてもつモノイドのトレイト
+impl<M> ac_library::Monoid for MonoidWithLength<M> where M: ac_library::Monoid {
+    type S = (M::S,usize);
+    fn identity() -> Self::S {
+        (M::identity(),0)
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        (M::binary_operation(&a.0, &b.0),a.1+b.1)
+    }
+}
+
+/// usizeとの乗算のトレイト
+pub trait MulByUsize {
+    /// usizeとの乗算の関数
+    fn mul_by_usize(&self, x: usize) -> Self;
+}
+
+impl<M> MulByUsize for ac_library::StaticModInt<M> where M: ac_library::Modulus {
+    fn mul_by_usize(&self, x: usize) -> Self {
+        *self*x
+    }
+}
+
+macro_rules! mul_by_usize {
+    ($($ty:ty),*) => {
+        $(
+            impl MulByUsize for $ty {
+                fn mul_by_usize(&self, x: usize) -> Self {
+                    self*x as $ty
+                }
+            }
+        )*
+    }
+}
+
+mul_by_usize!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
+
+pub struct RangeAffineRangeSum<M>(std::marker::PhantomData<M>);
+
+impl<M> ac_library::MapMonoid for RangeAffineRangeSum<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + ZeroElement + OneElement + MulByUsize {
+    type M = MonoidWithLength<M>;
+    type F = (M::S,M::S);
+    fn identity_map() -> Self::F {
+        (M::S::one_element(),<M as ac_library::Monoid>::S::zero_element())
+    }
+    fn mapping(f: &Self::F, x: &<Self::M as ac_library::Monoid>::S) -> <Self::M as ac_library::Monoid>::S {
+        (f.0.clone()*x.0.clone()+f.1.clone().mul_by_usize(x.1.clone()),x.1.clone())
     }
     fn composition(f: &Self::F, g: &Self::F) -> Self::F {
         (f.0.clone()*g.0.clone(),f.0.clone()*g.1.clone()+f.1.clone())
