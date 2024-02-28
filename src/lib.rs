@@ -5305,6 +5305,109 @@ impl PrueferCode for Vec<usize> {
     }
 }
 
+/// セグ木と同じ方法で区間ごとの値を管理する構造体
+#[derive(Clone, Default)]
+pub struct RangeBinaryHeap<S> {
+    n: usize,
+    log: usize,
+    val: Vec<S>
+}
+
+impl<S> RangeBinaryHeap<S> where S: Default + Clone {
+    pub fn new(n: usize) -> Self {
+        let log=(0usize.leading_zeros()-n.saturating_sub(1).leading_zeros()) as usize;
+        let len=2*(1<<log);
+        Self { n, log, val: vec![S::default();len] }
+    }
+    /// 与えられた位置のみからなる区間についての参照を返す関数
+    pub fn get(&self, i: usize) -> &S {
+        &self.val[(1<<self.log)+i]
+    }
+    /// 与えられた位置のみからなる区間についての可変参照を返す関数
+    pub fn get_mut(&mut self, i: usize) -> &mut S {
+        &mut self.val[(1<<self.log)+i]
+    }
+    /// 与えられた位置に関する値をもつ添字のベクターを返す関数
+    pub fn indices(&self, i: usize) -> Vec<usize> {
+        debug_assert!(i < self.n);
+        let mut idx=(1<<self.log)+i;
+        let mut ret=Vec::new();
+        while idx>0 {
+            ret.push(idx);
+            idx/=2;
+        }
+        ret
+    }
+    /// 与えられた区間をセグ木のように分割して、それぞれの添字およびその区間の端の組のベクターを返す関数（返す区間は左閉右開区間）
+    pub fn ranges<R>(&self, range: R) -> Vec<(usize,(usize,usize))> where R: std::ops::RangeBounds<usize> {
+        let r=match range.end_bound() {
+            std::ops::Bound::Included(&r) => r+1,
+            std::ops::Bound::Excluded(&r) => r,
+            std::ops::Bound::Unbounded => self.n,
+        };
+        let l=match range.start_bound() {
+            std::ops::Bound::Included(&l) => l,
+            std::ops::Bound::Excluded(&l) => l+1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        debug_assert!(l <= r && r <= self.n);
+        let digits=(0usize.leading_zeros()-(l^r).leading_zeros()) as usize-1;
+        let mut lower=l;
+        let mut d=0;
+        let mut is_first_half=true;
+        let mut ret=Vec::new();
+        loop {
+            if is_first_half {
+                if l&((1<<(digits+1))-1)==0 {
+                    d=digits;
+                    is_first_half=false;
+                    continue;
+                }
+                while lower&(1<<d)==0 {
+                    d+=1;
+                }
+                let old_lower=lower;
+                lower+=1<<d;
+                ret.push(((1<<(self.log-d))+(old_lower>>d),(old_lower,lower)));
+                while lower&(1<<d)==0 {
+                    d+=1;
+                }
+                if d==digits {
+                    is_first_half=false;
+                }
+            } else {
+                while d>0 && (lower&(1<<d)>0 || r&(1<<d)==0) {
+                    d-=1;
+                }
+                if d==0 && (lower&(1<<d)>0 || r&(1<<d)==0) {
+                    break;
+                }
+                let old_lower=lower;
+                lower+=1<<d;
+                ret.push(((1<<(self.log-d))+(old_lower>>d),(old_lower,lower)));
+                if d==0 {
+                    break;
+                }
+                d-=1;
+            }
+        };
+        ret
+    }
+}
+
+impl<S> std::ops::Index<usize> for RangeBinaryHeap<S> {
+    type Output = S;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.val[index]
+    }
+}
+
+impl<S> std::ops::IndexMut<usize> for RangeBinaryHeap<S> {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.val[index]
+    }
+}
+
 /// 高速ゼータ変換および高速メビウス変換についてのトレイト
 pub trait ZetaMobius {
     /// 上位集合についての高速ゼータ変換をする関数
