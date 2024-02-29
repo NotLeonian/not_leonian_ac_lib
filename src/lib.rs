@@ -659,14 +659,6 @@ impl VecGraph {
     pub fn size(&self) -> usize {
         self.graph.len()
     }
-    /// 隣接リストの参照を返す関数
-    pub fn get(&self) -> &Vec<Vec<(usize,usize)>> {
-        &self.graph
-    }
-    /// 隣接リストの可変参照を返す関数
-    pub fn get_mut(&mut self) -> &mut Vec<Vec<(usize,usize)>> {
-        &mut self.graph
-    }
     /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
     pub fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
@@ -1320,6 +1312,19 @@ impl VecGraph {
     }
 }
 
+impl std::ops::Index<usize> for VecGraph {
+    type Output = Vec<(usize,usize)>;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.graph[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for VecGraph {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.graph[index]
+    }
+}
+
 /// BTreeMapのベクターによるグラフの型（隣接の高速な判定が目的の型であるため、多重辺には対応していない）
 #[derive(Clone, Default, Debug)]
 pub struct MapGraph {
@@ -1334,14 +1339,6 @@ impl MapGraph {
     /// 頂点数を返す関数
     pub fn size(&self) -> usize {
         self.graph.len()
-    }
-    /// 隣接リストの参照を返す関数
-    pub fn get(&self) -> &Vec<std::collections::BTreeMap<usize,usize>> {
-        &self.graph
-    }
-    /// 隣接リストの可変参照を返す関数
-    pub fn get_mut(&mut self) -> &mut Vec<std::collections::BTreeMap<usize,usize>> {
-        &mut self.graph
     }
     /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
     pub fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
@@ -1902,6 +1899,19 @@ impl MapGraph {
     }
 }
 
+impl std::ops::Index<usize> for MapGraph {
+    type Output = std::collections::BTreeMap<usize,usize>;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.graph[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for MapGraph {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.graph[index]
+    }
+}
+
 /// 負の重みの辺をもつグラフの構造体
 #[derive(Clone, Default, Debug)]
 pub struct IsizeGraph {
@@ -1916,14 +1926,6 @@ impl IsizeGraph {
     /// 頂点数を返す関数
     pub fn size(&self) -> usize {
         self.graph.len()
-    }
-    /// 隣接リストの参照を返す関数
-    pub fn get(&self) -> &Vec<Vec<(usize,isize)>> {
-        &self.graph
-    }
-    /// 隣接リストの可変参照を返す関数
-    pub fn get_mut(&mut self) -> &mut Vec<Vec<(usize,isize)>> {
-        &mut self.graph
     }
     /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
     pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
@@ -2049,6 +2051,19 @@ impl IsizeGraph {
             }
         }
         dist
+    }
+}
+
+impl std::ops::Index<usize> for IsizeGraph {
+    type Output = Vec<(usize,isize)>;
+    fn index(&self, index: usize) -> &Self::Output {
+        &self.graph[index]
+    }
+}
+
+impl std::ops::IndexMut<usize> for IsizeGraph {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        &mut self.graph[index]
     }
 }
 
@@ -5319,6 +5334,10 @@ impl<S> RangeBinaryHeap<S> where S: Default + Clone {
         let len=2*(1<<log);
         Self { n, log, val: vec![S::default();len] }
     }
+    /// 要素数を2冪に切り上げたサイズを返す関数
+    pub fn size(&self) -> usize {
+        (1<<self.log) as usize
+    }
     /// 与えられた位置のみからなる区間についての参照を返す関数
     pub fn get(&self, i: usize) -> &S {
         &self.val[(1<<self.log)+i]
@@ -5326,6 +5345,46 @@ impl<S> RangeBinaryHeap<S> where S: Default + Clone {
     /// 与えられた位置のみからなる区間についての可変参照を返す関数
     pub fn get_mut(&mut self, i: usize) -> &mut S {
         &mut self.val[(1<<self.log)+i]
+    }
+    /// 与えられた区間についての値があればその参照を返す関数（返り値はOption）
+    pub fn get_range<R>(&self, range: R) -> Option<&S> where R: std::ops::RangeBounds<usize> {
+        let r=match range.end_bound() {
+            std::ops::Bound::Included(&r) => r+1,
+            std::ops::Bound::Excluded(&r) => r,
+            std::ops::Bound::Unbounded => self.n,
+        };
+        let l=match range.start_bound() {
+            std::ops::Bound::Included(&l) => l,
+            std::ops::Bound::Excluded(&l) => l+1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        debug_assert!(l <= r && r <= self.n);
+        let d=(r-l).trailing_zeros() as usize;
+        if r-l==1<<d && l%(1<<d)==0 {
+            Some(&self.val[(1<<(self.log-d))+(l>>d)])
+        } else {
+            None
+        }
+    }
+    /// 与えられた区間についての値があればその可変参照を返す関数（返り値はOption）
+    pub fn get_mut_range<R>(&mut self, range: R) -> Option<&mut S> where R: std::ops::RangeBounds<usize> {
+        let r=match range.end_bound() {
+            std::ops::Bound::Included(&r) => r+1,
+            std::ops::Bound::Excluded(&r) => r,
+            std::ops::Bound::Unbounded => self.n,
+        };
+        let l=match range.start_bound() {
+            std::ops::Bound::Included(&l) => l,
+            std::ops::Bound::Excluded(&l) => l+1,
+            std::ops::Bound::Unbounded => 0,
+        };
+        debug_assert!(l <= r && r <= self.n);
+        let d=(r-l).trailing_zeros() as usize;
+        if r-l==1<<d && l%(1<<d)==0 {
+            Some(&mut self.val[(1<<(self.log-d))+(l>>d)])
+        } else {
+            None
+        }
     }
     /// 与えられた位置に関する値をもつ添字のベクターを返す関数
     pub fn indices(&self, i: usize) -> Vec<usize> {
