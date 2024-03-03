@@ -572,6 +572,28 @@ pub fn max<T>(left: T, right: T) -> T where T: PartialOrd {
     }
 }
 
+/// 2つ以上の数のminを返すマクロ
+#[macro_export]
+macro_rules! min {
+    ($l:expr,$r:expr) => {
+        min($l,$r)
+    };
+    ($l:expr,$r:expr,$($vars:expr),+) => {
+        min($l,min!($r,$($vars),+))
+    };
+}
+
+/// 2つ以上の数のmaxを返すマクロ
+#[macro_export]
+macro_rules! max {
+    ($l:expr,$r:expr) => {
+        max($l,$r)
+    };
+    ($l:expr,$r:expr,$($vars:expr),+) => {
+        max($l,max!($r,$($vars),+))
+    };
+}
+
 /// chminとchmaxのトレイト
 pub trait ChminChmax {
     /// challengerのほうが小さければchallengerで上書きする関数
@@ -2464,6 +2486,10 @@ pub trait MapMultiSet {
     fn insert_one(&mut self, val: Self::T) -> Option<usize>;
     /// 多重集合から1つvalを削除する関数（返り値は削除した後のvalの個数のOption）
     fn remove_one(&mut self, val: Self::T) -> Option<usize>;
+    /// 多重集合にnumだけvalを追加する関数（返り値は追加した後のvalの個数のOption）
+    fn increase(&mut self, val: Self::T, num: usize) -> Option<usize>;
+    /// 多重集合からnumだけvalを削除する関数（返り値は削除した後のvalの個数のOption）
+    fn decrease(&mut self, val: Self::T, num: usize) -> Option<usize>;
 }
 
 impl<T> MapMultiSet for std::collections::BTreeMap<T, usize> where T: Copy + Ord {
@@ -2480,6 +2506,28 @@ impl<T> MapMultiSet for std::collections::BTreeMap<T, usize> where T: Copy + Ord
         if self.contains_key(&val) {
             if self[&val]>1 {
                 self.insert(val, self[&val]-1);
+                Some(self[&val])
+            } else {
+                self.remove(&val);
+                Some(0)
+            }
+        } else {
+            self.remove(&val);
+            None
+        }
+    }
+    fn increase(&mut self, val: Self::T, num: usize) -> Option<usize> {
+        if self.contains_key(&val) {
+            self.insert(val, self[&val]+num);
+        } else {
+            self.insert(val, num);
+        }
+        Some(self[&val])
+    }
+    fn decrease(&mut self, val: Self::T, num: usize) -> Option<usize> {
+        if self.contains_key(&val) {
+            if self[&val]>num {
+                self.insert(val, self[&val]-num);
                 Some(self[&val])
             } else {
                 self.remove(&val);
