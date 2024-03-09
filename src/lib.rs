@@ -660,6 +660,126 @@ pub type Mint=ac_library::ModInt998244353;
 /// ModInt1000000007を表す型
 pub type OldMint=ac_library::ModInt1000000007;
 
+/// グリッド上の進行方向を表す型
+#[derive(Clone, Copy, Debug)]
+pub enum GridDir {
+    R,
+    UR,
+    U,
+    UL,
+    L,
+    DL,
+    D,
+    DR
+}
+
+impl GridDir {
+    /// 進行方向を時計回りに90°回転させる関数
+    pub fn clockwise_90deg(&mut self) {
+        *self=match *self {
+            GridDir::R => GridDir::D,
+            GridDir::UR => GridDir::DR,
+            GridDir::U => GridDir::R,
+            GridDir::UL => GridDir::UR,
+            GridDir::L => GridDir::U,
+            GridDir::DL => GridDir::UL,
+            GridDir::D => GridDir::L,
+            GridDir::DR => GridDir::DL
+        }
+    }
+    /// 進行方向を反時計回りに90°回転させる関数
+    pub fn counterclockwise_90deg(&mut self) {
+        *self=match *self {
+            GridDir::R => GridDir::U,
+            GridDir::UR => GridDir::UL,
+            GridDir::U => GridDir::L,
+            GridDir::UL => GridDir::DL,
+            GridDir::L => GridDir::D,
+            GridDir::DL => GridDir::DR,
+            GridDir::D => GridDir::R,
+            GridDir::DR => GridDir::UR
+        }
+    }
+    /// 進行方向を時計回りに45°回転させる関数
+    pub fn clockwise_45deg(&mut self) {
+        *self=match *self {
+            GridDir::R => GridDir::DR,
+            GridDir::UR => GridDir::R,
+            GridDir::U => GridDir::UR,
+            GridDir::UL => GridDir::U,
+            GridDir::L => GridDir::UL,
+            GridDir::DL => GridDir::L,
+            GridDir::D => GridDir::DL,
+            GridDir::DR => GridDir::D
+        }
+    }
+    /// 進行方向を反時計回りに45°回転させる関数
+    pub fn counterclockwise_45deg(&mut self) {
+        *self=match *self {
+            GridDir::R => GridDir::UR,
+            GridDir::UR => GridDir::U,
+            GridDir::U => GridDir::UL,
+            GridDir::UL => GridDir::L,
+            GridDir::L => GridDir::DL,
+            GridDir::DL => GridDir::D,
+            GridDir::D => GridDir::DR,
+            GridDir::DR => GridDir::R
+        }
+    }
+}
+
+/// 2次元グリッドの構造体
+pub struct TwoDimGrid {
+    h: usize,
+    w: usize,
+    grid: Vec<Vec<bool>>,
+    is_torus: bool
+}
+
+impl TwoDimGrid {
+    /// 大きさh×wの2次元グリッドを構築する関数（is_torusは上下および左右が繋がっているかどうか）
+    pub fn construct_grid(h: usize, w: usize, is_torus: bool) -> Self {
+        Self { h, w, grid: vec![vec![true;w];h], is_torus }
+    }
+    /// charsで表される、大きさh×wの2次元グリッドを構築する関数（wallは進めないマスを表す文字で、is_torusは上下および左右が繋がっているかどうか）
+    pub fn construct_grid_from_chars(h: usize, w:usize, chars: &Vec<Vec<char>>, wall: char, is_torus: bool) -> Self {
+        let grid=vec_range(0, h, |i| vec_range(0, w, |j| chars[i][j]!=wall));
+        Self { h, w, grid, is_torus }
+    }
+    /// 与えられたマスが進めないマスでないかを返す関数
+    pub fn is_valid_cell(&self, ij: (usize,usize)) -> bool {
+        self.grid[ij.0][ij.1]
+    }
+    /// 与えられたマスと進行方向から、次のマスに進める場合のマスを返す関数（返り値はOption）
+    pub fn next_cell(&self, ij: (usize,usize), dir: GridDir) -> Option<(usize,usize)> {
+        debug_assert!(ij.0<self.h && ij.1<self.w);
+        let (cur_i,cur_j)=(ij.0 as isize,ij.1 as isize);
+        let (next_i,next_j)=match dir {
+            GridDir::R => (cur_i,cur_j+1),
+            GridDir::UR => (cur_i-1,cur_j+1),
+            GridDir::U => (cur_i-1,cur_j),
+            GridDir::UL => (cur_i-1,cur_j-1),
+            GridDir::L => (cur_i,cur_j-1),
+            GridDir::DL => (cur_i+1,cur_j-1),
+            GridDir::D => (cur_i+1,cur_j),
+            GridDir::DR => (cur_i+1,cur_j+1)
+        };
+        let (next_i,next_j)=if self.is_torus {
+            ((next_i+self.h as isize) as usize%self.h,(next_j+self.w as isize) as usize%self.w)
+        } else {
+            if next_i<0 || self.h<=next_i as usize || next_j<0 || self.w<=next_j as usize {
+                return None;
+            }
+            (next_i as usize,next_j as usize)
+        };
+        if self.grid[next_i][next_j] {
+            Some((next_i,next_j))
+        } else {
+            None
+        }
+    }
+}
+
 /// DFSやBFSのイテレータのもつ列挙型（Vertexが行きであるかどうかと頂点番号、VertexEdgeWeightが頂点番号と隣接する頂点番号とその辺の重み）
 pub enum GraphSearch {
     Vertex(bool,usize),
@@ -2185,6 +2305,26 @@ pub fn two_pointers<F>(n: usize, m: usize, increase: bool, satisfied: bool, dete
             }
         }
     })
+}
+
+/// 2次元ベクターを回転させてアクセスするトレイト
+pub trait GridRotation {
+    /// 2次元ベクターを回転させてアクセスする関数（反時計回りに90°×num回転させたときの(i,j)にアクセスする）
+    fn rotate(&self, num: usize, i: usize, j: usize) -> <Self::Output as std::ops::Index<usize>>::Output where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize>;
+}
+
+impl<T> GridRotation for Vec<Vec<T>> where T: Clone {
+    fn rotate(&self, num: usize, i: usize, j: usize) -> <<Self as std::ops::Index<usize>>::Output as std::ops::Index<usize>>::Output {
+        if num%4==0 {
+            self[i][j].clone()
+        } else if num%4==1 {
+            self[self[0].len()-1-j][i].clone()
+        } else if num%2==1 {
+            self[self.len()-1-i][self[0].len()-1-j].clone()
+        } else {
+            self[j][self.len()-1-i].clone()
+        }
+    }
 }
 
 /// 最小値を取り出すことのできる優先度つきキューの構造体
