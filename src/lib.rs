@@ -2817,6 +2817,188 @@ impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + ZeroElement + std::ops:
     }
 }
 
+/// 双方向連結リストのノードの型
+pub type RcRefCellDoublyLinkedListNode<T>=std::rc::Rc<std::cell::RefCell<DoublyLinkedListNode<T>>>;
+
+/// 双方向連結リストのノードの構造体
+#[derive(Clone, Default, Debug)]
+pub struct DoublyLinkedListNode<T> {
+    val: Option<T>,
+    prev: Option<RcRefCellDoublyLinkedListNode<T>>,
+    next: Option<RcRefCellDoublyLinkedListNode<T>>
+}
+
+impl<T> DoublyLinkedListNode<T> {
+    /// ノードの値を変更する関数（返り値は番兵でないかどうか）
+    pub fn set(&mut self, val: T) -> bool {
+        if self.val.is_some() {
+            self.val=Some(val);
+            true
+        } else {
+            false
+        }
+    }
+    /// ノードの値を返す関数（返り値はOptionの参照であることに注意）
+    pub fn get(&self) -> &Option<T> {
+        &self.val
+    }
+    /// このノードの前のノードを返す関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    pub fn prev(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        self.prev.clone()
+    }
+    /// このノードの後ろのノードを返す関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    pub fn next(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        self.next.clone()
+    }
+    /// このノードの前に値を追加する関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    pub fn insert_prev(&mut self, val: T) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        if self.prev.is_some() {
+            let new_prev=std::rc::Rc::new(std::cell::RefCell::new(DoublyLinkedListNode::<T> {
+                val: Some(val),
+                prev: self.prev.clone(),
+                next: self.prev.clone().unwrap().borrow().next.clone()
+            }));
+            self.prev.clone().unwrap().borrow_mut().next=Some(new_prev.clone());
+            self.prev=Some(new_prev.clone());
+            Some(new_prev)
+        } else {
+            None
+        }
+    }
+    /// このノードの後ろに値を追加する関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    pub fn insert_next(&mut self, val: T) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        if self.next.is_some() {
+            let new_next=std::rc::Rc::new(std::cell::RefCell::new(DoublyLinkedListNode::<T> {
+                val: Some(val),
+                prev: self.next.clone().unwrap().borrow().prev.clone(),
+                next: self.next.clone()
+            }));
+            self.next.clone().unwrap().borrow_mut().prev=Some(new_next.clone());
+            self.next=Some(new_next.clone());
+            Some(new_next)
+        } else {
+            None
+        }
+    }
+    /// このノードをリストから削除する関数（返り値はこのノードが削除できるかどうか）
+    pub fn remove(&self) -> bool {
+        if self.val.is_some() {
+            self.prev.clone().unwrap().borrow_mut().next=self.next.clone();
+            self.next.clone().unwrap().borrow_mut().prev=self.prev.clone();
+            true
+        } else {
+            false
+        }
+    }
+}
+
+/// 双方向連結リストのイテレータの構造体
+#[derive(Clone, Default, Debug)]
+pub struct DoublyLinkedListIter<T> {
+    begin: RcRefCellDoublyLinkedListNode<T>,
+    end: RcRefCellDoublyLinkedListNode<T>
+}
+
+impl<T> Iterator for DoublyLinkedListIter<T> {
+    type Item = RcRefCellDoublyLinkedListNode<T>;
+    fn next(&mut self) -> Option<Self::Item> {
+        if std::rc::Rc::ptr_eq(&self.begin, &self.end) {
+            None
+        } else if let Some(next)=self.begin.clone().borrow().next.clone() {
+            self.begin=next.clone();
+            if !std::rc::Rc::ptr_eq(&self.begin, &self.end) && next.clone().borrow().val.is_some() {
+                Some(next.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl<T> DoubleEndedIterator for DoublyLinkedListIter<T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if std::rc::Rc::ptr_eq(&self.begin, &self.end) {
+            None
+        } else if let Some(back)=self.end.clone().borrow().prev.clone() {
+            self.end=back.clone();
+            if !std::rc::Rc::ptr_eq(&self.begin, &self.end) && back.clone().borrow().val.is_some() {
+                Some(back.clone())
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+}
+
+impl<T> std::iter::FusedIterator for DoublyLinkedListIter<T> {}
+
+/// 双方向連結リストの構造体
+#[derive(Clone, Default, Debug)]
+pub struct DoublyLinkedList<T> {
+    begin: RcRefCellDoublyLinkedListNode<T>,
+    end: RcRefCellDoublyLinkedListNode<T>
+}
+
+impl<T> DoublyLinkedList<T> {
+    pub fn new() -> Self {
+        let begin=std::rc::Rc::new(std::cell::RefCell::new(DoublyLinkedListNode::<T> {
+            val: None,
+            prev: None,
+            next: None
+        }));
+        let end=std::rc::Rc::new(std::cell::RefCell::new(DoublyLinkedListNode::<T> {
+            val: None,
+            prev: None,
+            next: None
+        }));
+        begin.borrow_mut().next=Some(end.clone());
+        end.borrow_mut().prev=Some(begin.clone());
+        Self { begin, end }
+    }
+    /// 先頭のノードがあれば返す関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    pub fn first(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        let first=self.begin.borrow().next.clone().unwrap();
+        if first.borrow().val.is_some() {
+            Some(first)
+        } else {
+            None
+        }
+    }
+    /// 末尾のノードがあれば返す関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    pub fn last(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        let last=self.end.borrow().prev.clone().unwrap();
+        if last.borrow().val.is_some() {
+            Some(last)
+        } else {
+            None
+        }
+    }
+    /// 先頭の番兵を返す関数（返り値はノードのRefCellのRcであることに注意）
+    pub fn begin_sentinel(&self) -> RcRefCellDoublyLinkedListNode<T> {
+        self.begin.clone()
+    }
+    /// 末尾の番兵を返す関数（返り値はノードのRefCellのRcであることに注意）
+    pub fn end_sentinel(&self) -> RcRefCellDoublyLinkedListNode<T> {
+        self.end.clone()
+    }
+    /// イテレータを返す関数
+    pub fn iter(&self) -> DoublyLinkedListIter<T> {
+        DoublyLinkedListIter { begin: self.begin.clone(), end: self.end.clone() }
+    }
+}
+
+impl<T> IntoIterator for &DoublyLinkedList<T> {
+    type Item = <DoublyLinkedListIter<T> as Iterator>::Item;
+    type IntoIter = DoublyLinkedListIter<T>;
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
 /// BTreeMapを用いて個数を管理する多重集合についての型
 pub type MultiSet<T>=std::collections::BTreeMap<T, usize>;
 
