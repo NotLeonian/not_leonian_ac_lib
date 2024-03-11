@@ -100,6 +100,102 @@ impl<T, const N: usize> Outputlns for [T;N] where T: Sized + Outputln {
     }
 }
 
+/// 配列やベクターの中身を改行して出力するトレイト
+pub trait OutputLns {
+    /// 配列やベクターの中身を改行して出力する関数
+    fn outputlns(&self);
+}
+
+impl<T> OutputLns for Vec<T> where T: std::fmt::Display {
+    fn outputlns(&self) {
+        for var in self {
+            println!("{}",&var);
+        }
+    }
+}
+
+impl<T> OutputLns for [T] where T: std::fmt::Display {
+    fn outputlns(&self) {
+        for var in self {
+            println!("{}",&var);
+        }
+    }
+}
+
+impl<T, const N: usize> OutputLns for [T;N] where T: Sized + std::fmt::Display {
+    fn outputlns(&self) {
+        for var in self {
+            println!("{}",&var);
+        }
+    }
+}
+
+/// 1つ以上の値を区切り文字なしで1行で出力するマクロ
+#[macro_export]
+macro_rules! outputcatln {
+    ($var:expr) => {
+        println!("{}",$var)
+    };
+    ($var:expr,$($vars:expr),+) => {
+        print!("{}",$var);
+        outputcatln!($($vars),+);
+    };
+}
+
+/// 1つ以上の値のDebugを区切り文字なしで1行で出力するマクロ
+#[macro_export]
+macro_rules! debugcatln {
+    ($var:expr) => {
+        println!("{:?}",$var)
+    };
+    ($var:expr,$($vars:expr),+) => {
+        print!("{:?}",$var);
+        debugcatln!($($vars),+);
+    };
+}
+
+/// 配列やベクターの中身を区切り文字なしで1行で出力するトレイト
+pub trait OutputCatln {
+    /// 配列やベクターの中身を1行で出力する関数
+    fn outputcatln(&self);
+}
+
+impl<T> OutputCatln for Vec<T> where T: std::fmt::Display {
+    fn outputcatln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                print!("{}",&var);
+            } else {
+                println!("{}",&var);
+            }
+        }
+    }
+}
+
+impl<T> OutputCatln for [T] where T: std::fmt::Display {
+    fn outputcatln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                print!("{}",&var);
+            } else {
+                println!("{}",&var);
+            }
+        }
+    }
+}
+
+impl<T, const N: usize> OutputCatln for [T;N] where T: Sized + std::fmt::Display {
+    fn outputcatln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<N-1 {
+                print!("{}",&var);
+            } else {
+                println!("{}",&var);
+            }
+        }
+    }
+}
+
 /// 条件によって変わる1行を出力する関数（引数は順に条件と真の場合、偽の場合の出力）
 pub fn outputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display, T2: std::fmt::Display {
     if cond {
@@ -232,6 +328,112 @@ impl<T, const N: usize> Eoutputlns for [T;N] where T: Sized + Eoutputln {
         #[cfg(debug_assertions)]
         for v in self {
             v.eoutputln();
+        }
+    }
+}
+
+/// 配列やベクターの中身を改行してstderrに出力するトレイト
+pub trait EoutputLns {
+    /// 配列やベクターの中身を改行してstderrに出力する関数
+    fn eoutputlns(&self);
+}
+
+impl<T> EoutputLns for Vec<T> where T: std::fmt::Display {
+    fn eoutputlns(&self) {
+        #[cfg(debug_assertions)]
+        for var in self {
+            eprintln!("{}",&var);
+        }
+    }
+}
+
+impl<T> EoutputLns for [T] where T: std::fmt::Display {
+    fn eoutputlns(&self) {
+        #[cfg(debug_assertions)]
+        for var in self {
+            eprintln!("{}",&var);
+        }
+    }
+}
+
+impl<T, const N: usize> EoutputLns for [T;N] where T: Sized + std::fmt::Display {
+    fn eoutputlns(&self) {
+        #[cfg(debug_assertions)]
+        for var in self {
+            eprintln!("{}",&var);
+        }
+    }
+}
+
+/// 1つ以上の値を区切り文字なしで1行でstderrに出力するマクロ
+#[macro_export]
+macro_rules! eoutputcatln {
+    ($var:expr) => {
+        #[cfg(debug_assertions)]
+        eprintln!("{}",$var)
+    };
+    ($var:expr,$($vars:expr),+) => {
+        #[cfg(debug_assertions)]
+        eprint!("{}",$var);
+        eoutputcatln!($($vars),+);
+    };
+}
+
+/// 1つ以上の値のDebugを区切り文字なしで1行でstderrに出力するマクロ
+#[macro_export]
+macro_rules! edebugcatln {
+    ($var:expr) => {
+        #[cfg(debug_assertions)]
+        eprintln!("{:?}",$var)
+    };
+    ($var:expr,$($vars:expr),+) => {
+        #[cfg(debug_assertions)]
+        eprint!("{:?}",$var);
+        edebugcatln!($($vars),+);
+    };
+}
+
+/// 配列やベクターの中身を区切り文字なしで1行でstderrに出力するトレイト
+pub trait EoutputCatln {
+    /// 配列やベクターの中身を1行でstderrに出力する関数
+    fn eoutputcatln(&self);
+}
+
+impl<T> EoutputCatln for Vec<T> where T: std::fmt::Display {
+    fn eoutputcatln(&self) {
+        #[cfg(debug_assertions)]
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                eprint!("{}",&var);
+            } else {
+                eprintln!("{}",&var);
+            }
+        }
+    }
+}
+
+impl<T> EoutputCatln for [T] where T: std::fmt::Display {
+    fn eoutputcatln(&self) {
+        #[cfg(debug_assertions)]
+        for (i,var) in self.iter().enumerate() {
+            if i<self.len()-1 {
+                eprint!("{}",&var);
+            } else {
+                eprintln!("{}",&var);
+            }
+        }
+    }
+}
+
+impl<T, const N: usize> EoutputCatln for [T;N] where T: Sized + std::fmt::Display {
+    #[cfg(debug_assertions)]
+    fn eoutputcatln(&self) {
+        for (i,var) in self.iter().enumerate() {
+            if i<N-1 {
+                eprint!("{}",&var);
+            } else {
+                eprintln!("{}",&var);
+            }
         }
     }
 }
