@@ -8,7 +8,7 @@
 #[macro_export]
 macro_rules! outputln {
     ($var:expr) => {
-        println!("{}",$var)
+        println!("{}",$var);
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{} ",$var);
@@ -20,7 +20,7 @@ macro_rules! outputln {
 #[macro_export]
 macro_rules! debugln {
     ($var:expr) => {
-        println!("{:?}",$var)
+        println!("{:?}",$var);
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{:?} ",$var);
@@ -40,9 +40,10 @@ impl<T> Outputln for Vec<T> where T: std::fmt::Display {
             if i<self.len()-1 {
                 print!("{} ",&var);
             } else {
-                println!("{}",&var);
+                print!("{}",&var);
             }
         }
+        println!();
     }
 }
 
@@ -52,9 +53,10 @@ impl<T> Outputln for [T] where T: std::fmt::Display {
             if i<self.len()-1 {
                 print!("{} ",&var);
             } else {
-                println!("{}",&var);
+                print!("{}",&var);
             }
         }
+        println!();
     }
 }
 
@@ -64,9 +66,10 @@ impl<T, const N: usize> Outputln for [T;N] where T: Sized + std::fmt::Display {
             if i<N-1 {
                 print!("{} ",&var);
             } else {
-                println!("{}",&var);
+                print!("{}",&var);
             }
         }
+        println!();
     }
 }
 
@@ -134,7 +137,7 @@ impl<T, const N: usize> OutputLns for [T;N] where T: Sized + std::fmt::Display {
 #[macro_export]
 macro_rules! outputcatln {
     ($var:expr) => {
-        println!("{}",$var)
+        println!("{}",$var);
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{}",$var);
@@ -146,7 +149,7 @@ macro_rules! outputcatln {
 #[macro_export]
 macro_rules! debugcatln {
     ($var:expr) => {
-        println!("{:?}",$var)
+        println!("{:?}",$var);
     };
     ($var:expr,$($vars:expr),+) => {
         print!("{:?}",$var);
@@ -162,37 +165,28 @@ pub trait OutputCatln {
 
 impl<T> OutputCatln for Vec<T> where T: std::fmt::Display {
     fn outputcatln(&self) {
-        for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
-                print!("{}",&var);
-            } else {
-                println!("{}",&var);
-            }
+        for var in self {
+            print!("{}",&var);
         }
+        println!();
     }
 }
 
 impl<T> OutputCatln for [T] where T: std::fmt::Display {
     fn outputcatln(&self) {
-        for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
-                print!("{}",&var);
-            } else {
-                println!("{}",&var);
-            }
+        for var in self {
+            print!("{}",&var);
         }
+        println!();
     }
 }
 
 impl<T, const N: usize> OutputCatln for [T;N] where T: Sized + std::fmt::Display {
     fn outputcatln(&self) {
-        for (i,var) in self.iter().enumerate() {
-            if i<N-1 {
-                print!("{}",&var);
-            } else {
-                println!("{}",&var);
-            }
+        for var in self {
+            print!("{}",&var);
         }
+        println!();
     }
 }
 
@@ -231,12 +225,16 @@ impl OutputValOr for usize {
 macro_rules! eoutputln {
     ($var:expr) => {
         #[cfg(debug_assertions)]
-        eprintln!("{}",$var)
+        {
+            eprintln!("{}",$var);
+        }
     };
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
-        eprint!("{} ",$var);
-        eoutputln!($($vars),+);
+        {
+            eprint!("{} ",$var);
+            eoutputln!($($vars),+);
+        }
     };
 }
 
@@ -245,12 +243,16 @@ macro_rules! eoutputln {
 macro_rules! edebugln {
     ($var:expr) => {
         #[cfg(debug_assertions)]
-        eprintln!("{:?}",$var)
+        {
+            eprintln!("{:?}",$var);
+        }
     };
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
-        eprint!("{:?} ",$var);
-        edebugln!($($vars),+);
+        {
+            eprint!("{:?} ",$var);
+            edebugln!($($vars),+);
+        }
     };
 }
 
@@ -263,12 +265,15 @@ pub trait Eoutputln {
 impl<T> Eoutputln for Vec<T> where T: std::fmt::Display {
     fn eoutputln(&self) {
         #[cfg(debug_assertions)]
-        for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
-                eprint!("{} ",&var);
-            } else {
-                eprintln!("{}",&var);
+        {
+            for (i,var) in self.iter().enumerate() {
+                if i<self.len()-1 {
+                    eprint!("{} ",&var);
+                } else {
+                    eprint!("{}",&var);
+                }
             }
+            eprintln!();
         }
     }
 }
@@ -276,12 +281,15 @@ impl<T> Eoutputln for Vec<T> where T: std::fmt::Display {
 impl<T> Eoutputln for [T] where T: std::fmt::Display {
     fn eoutputln(&self) {
         #[cfg(debug_assertions)]
-        for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
-                eprint!("{} ",&var);
-            } else {
-                eprintln!("{}",&var);
+        {
+            for (i,var) in self.iter().enumerate() {
+                if i<self.len()-1 {
+                    eprint!("{} ",&var);
+                } else {
+                    eprint!("{}",&var);
+                }
             }
+            eprintln!();
         }
     }
 }
@@ -289,12 +297,15 @@ impl<T> Eoutputln for [T] where T: std::fmt::Display {
 impl<T, const N: usize> Eoutputln for [T;N] where T: Sized + std::fmt::Display {
     fn eoutputln(&self) {
         #[cfg(debug_assertions)]
-        for (i,var) in self.iter().enumerate() {
-            if i<N-1 {
-                eprint!("{} ",&var);
-            } else {
-                eprintln!("{}",&var);
+        {
+            for (i,var) in self.iter().enumerate() {
+                if i<self.len()-1 {
+                    eprint!("{} ",&var);
+                } else {
+                    eprint!("{}",&var);
+                }
             }
+            eprintln!();
         }
     }
 }
@@ -370,12 +381,16 @@ impl<T, const N: usize> EoutputLns for [T;N] where T: Sized + std::fmt::Display 
 macro_rules! eoutputcatln {
     ($var:expr) => {
         #[cfg(debug_assertions)]
-        eprintln!("{}",$var)
+        {
+            eprintln!("{}",$var);
+        }
     };
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
-        eprint!("{}",$var);
-        eoutputcatln!($($vars),+);
+        {
+            eprint!("{}",$var);
+            eoutputcatln!($($vars),+);
+        }
     };
 }
 
@@ -384,12 +399,16 @@ macro_rules! eoutputcatln {
 macro_rules! edebugcatln {
     ($var:expr) => {
         #[cfg(debug_assertions)]
-        eprintln!("{:?}",$var)
+        {
+            eprintln!("{:?}",$var);
+        }
     };
     ($var:expr,$($vars:expr),+) => {
         #[cfg(debug_assertions)]
-        eprint!("{:?}",$var);
-        edebugcatln!($($vars),+);
+        {
+            eprint!("{:?}",$var);
+            edebugcatln!($($vars),+);
+        }
     };
 }
 
@@ -402,12 +421,11 @@ pub trait EoutputCatln {
 impl<T> EoutputCatln for Vec<T> where T: std::fmt::Display {
     fn eoutputcatln(&self) {
         #[cfg(debug_assertions)]
-        for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
+        {
+            for var in self {
                 eprint!("{}",&var);
-            } else {
-                eprintln!("{}",&var);
             }
+            eprintln!();
         }
     }
 }
@@ -415,25 +433,23 @@ impl<T> EoutputCatln for Vec<T> where T: std::fmt::Display {
 impl<T> EoutputCatln for [T] where T: std::fmt::Display {
     fn eoutputcatln(&self) {
         #[cfg(debug_assertions)]
-        for (i,var) in self.iter().enumerate() {
-            if i<self.len()-1 {
+        {
+            for var in self {
                 eprint!("{}",&var);
-            } else {
-                eprintln!("{}",&var);
             }
+            eprintln!();
         }
     }
 }
 
 impl<T, const N: usize> EoutputCatln for [T;N] where T: Sized + std::fmt::Display {
-    #[cfg(debug_assertions)]
     fn eoutputcatln(&self) {
-        for (i,var) in self.iter().enumerate() {
-            if i<N-1 {
+        #[cfg(debug_assertions)]
+        {
+            for var in self {
                 eprint!("{}",&var);
-            } else {
-                eprintln!("{}",&var);
             }
+            eprintln!();
         }
     }
 }
@@ -453,7 +469,9 @@ pub fn eoutputif<T1,T2>(cond: bool, ok: T1, bad: T2) where T1: std::fmt::Display
 #[allow(unused_variables)]
 pub fn eoutput_yes_or_no(cond: bool) {
     #[cfg(debug_assertions)]
-    eoutputif(cond, "Yes", "No");
+    {
+        eoutputif(cond, "Yes", "No");
+    }
 }
 
 /// 存在すれば値を、存在しなければ-1をstderrに出力するトレイト
@@ -604,7 +622,7 @@ maximal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize)
 
 /// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
 pub trait GetFromLast {
-    /// 配列やベクターに末尾から数えたインデックスでアクセスする関数（1-indexedであることに注意）
+    /// 配列やベクターに末尾から数えたインデックスでアクセスする関数（1-basedであることに注意）
     fn get_from_last(&self, i: usize) -> &Self::Output where Self: std::ops::Index<usize>;
 }
 
@@ -634,7 +652,7 @@ impl<T> GetFromLast for std::collections::VecDeque<T> {
 
 /// 配列やベクターに末尾から数えたインデックスでmutでアクセスするトレイト
 pub trait GetMutFromLast {
-    /// 配列やベクターに末尾から数えたインデックスでmutでアクセスする関数（1-indexedであることに注意）
+    /// 配列やベクターに末尾から数えたインデックスでmutでアクセスする関数（1-basedであることに注意）
     fn get_mut_from_last(&mut self, i: usize) -> &mut Self::Output where Self: std::ops::Index<usize>;
 }
 
@@ -666,7 +684,7 @@ impl<T> GetMutFromLast for std::collections::VecDeque<T> {
     }
 }
 
-/// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-indexedの左閉右開区間）
+/// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-basedの左閉右開区間）
 pub fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
     (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
 }
@@ -1003,7 +1021,7 @@ impl VecGraph {
     pub fn size(&self) -> usize {
         self.graph.len()
     }
-    /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-based）
     pub fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
         let mut g=VecGraph::new(n);
@@ -1013,7 +1031,7 @@ impl VecGraph {
         }
         g
     }
-    /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-based）
     pub fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
         let mut g=VecGraph::new(n);
@@ -1022,7 +1040,7 @@ impl VecGraph {
         }
         g
     }
-    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-based）
     pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=VecGraph::new(n);
@@ -1032,7 +1050,7 @@ impl VecGraph {
         }
         g
     }
-    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-based）
     pub fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=VecGraph::new(n);
@@ -1276,7 +1294,7 @@ impl VecGraph {
             None
         }
     }
-    /// グラフからUnion-Find木を構築する関数（0-indexed）
+    /// グラフからUnion-Find木を構築する関数（0-based）
     pub fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
         for v in 0..self.size() {
@@ -1553,7 +1571,7 @@ impl VecGraph {
         }
         (list,par)
     }
-    /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
+    /// 木のプリューファーコードを返す関数（0-based）（グラフが無向木でない場合の動作は保証しない）
     pub fn pruefer_code(&self) -> Vec<usize> {
         let n=self.size();
         let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
@@ -1684,7 +1702,7 @@ impl MapGraph {
     pub fn size(&self) -> usize {
         self.graph.len()
     }
-    /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みなし無向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-based）
     pub fn construct_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
         let mut g=MapGraph::new(n);
@@ -1694,7 +1712,7 @@ impl MapGraph {
         }
         g
     }
-    /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みなし有向グラフについて、与えられた頂点数、辺数、辺の一覧から隣接リストを構築する関数（0-based）
     pub fn construct_directed_graph(n: usize, m: usize, ab: &Vec<(usize,usize)>) -> Self {
         debug_assert_eq!(ab.len(), m);
         let mut g=MapGraph::new(n);
@@ -1703,7 +1721,7 @@ impl MapGraph {
         }
         g
     }
-    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-based）
     pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=MapGraph::new(n);
@@ -1713,7 +1731,7 @@ impl MapGraph {
         }
         g
     }
-    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-based）
     pub fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,usize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=MapGraph::new(n);
@@ -1964,7 +1982,7 @@ impl MapGraph {
             None
         }
     }
-    /// グラフからUnion-Find木を構築する関数（0-indexed）
+    /// グラフからUnion-Find木を構築する関数（0-based）
     pub fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
         for v in 0..self.size() {
@@ -2140,7 +2158,7 @@ impl MapGraph {
             self.graph[a].iter().filter(|&(&b,_)| par[b]==a && ord[a]<=low[b]).count()+1
         }
     }
-    /// 木のプリューファーコードを返す関数（0-indexed）（グラフが無向木でない場合の動作は保証しない）
+    /// 木のプリューファーコードを返す関数（0-based）（グラフが無向木でない場合の動作は保証しない）
     pub fn pruefer_code(&self) -> Vec<usize> {
         let n=self.size();
         let mut adjacency_list=vec![std::collections::BTreeSet::<usize>::new();n];
@@ -2271,7 +2289,7 @@ impl IsizeGraph {
     pub fn size(&self) -> usize {
         self.graph.len()
     }
-    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-based）
     pub fn construct_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=IsizeGraph::new(n);
@@ -2281,7 +2299,7 @@ impl IsizeGraph {
         }
         g
     }
-    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-indexed）
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から隣接リストを構築する関数（0-based）
     pub fn construct_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=IsizeGraph::new(n);
@@ -2290,7 +2308,7 @@ impl IsizeGraph {
         }
         g
     }
-    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から、辺の重みの符号を反転した隣接リストを構築する関数（0-indexed）
+    /// 重みつき無向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から、辺の重みの符号を反転した隣接リストを構築する関数（0-based）
     pub fn construct_inversed_weighted_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=IsizeGraph::new(n);
@@ -2300,7 +2318,7 @@ impl IsizeGraph {
         }
         g
     }
-    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から、辺の重みの符号を反転した隣接リストを構築する関数（0-indexed）
+    /// 重みつき有向グラフについて、与えられた頂点数、辺数、辺と重みの一覧から、辺の重みの符号を反転した隣接リストを構築する関数（0-based）
     pub fn construct_inversed_weighted_directed_graph(n: usize, m: usize, abw: &Vec<(usize,usize,isize)>) -> Self {
         debug_assert_eq!(abw.len(), m);
         let mut g=IsizeGraph::new(n);
@@ -2765,7 +2783,7 @@ impl<I> ModIntFact for ac_library::DynamicModInt<I> where I: ac_library::Id {
 pub trait PrefixSum {
     /// 累積和のベクターを構築する関数
     fn construct_prefix_sum(&self) -> Self;
-    /// 構築した累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
+    /// 構築した累積和のベクターから部分和を計算する関数（0-basedの左閉右開区間）
     fn calculate_partial_sum(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
 }
 
@@ -2788,7 +2806,7 @@ impl<T> PrefixSum for Vec<T> where T: Clone + ZeroElement + std::ops::Add<Output
 pub trait TwoDimPrefixSum {
     /// 2次元累積和のベクターを構築する関数
     fn construct_2d_prefix_sum(&self) -> Self;
-    /// 構築した2次元累積和のベクターから部分和を計算する関数（0-indexedの左閉右開区間）
+    /// 構築した2次元累積和のベクターから部分和を計算する関数（0-basedの左閉右開区間）
     fn calculate_2d_partial_sum(&self, l_i: usize, l_j: usize, r_i: usize, r_j: usize) -> <Self::Output as std::ops::Index<usize>>::Output where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize>;
 }
 
@@ -2850,7 +2868,7 @@ impl<T> DoublyLinkedListNode<T> {
     pub fn next(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
         self.next.clone()
     }
-    /// このノードの前に値を追加する関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    /// このノードの前にノードを追加する関数（返り値は追加したノードのRefCellのRcのOptionであることに注意）
     pub fn insert_prev(&mut self, val: T) -> Option<RcRefCellDoublyLinkedListNode<T>> {
         if self.prev.is_some() {
             let new_prev=std::rc::Rc::new(std::cell::RefCell::new(DoublyLinkedListNode::<T> {
@@ -2865,7 +2883,7 @@ impl<T> DoublyLinkedListNode<T> {
             None
         }
     }
-    /// このノードの後ろに値を追加する関数（返り値はノードのRefCellのRcのOptionであることに注意）
+    /// このノードの後ろにノードを追加する関数（返り値は追加したノードのRefCellのRcのOptionであることに注意）
     pub fn insert_next(&mut self, val: T) -> Option<RcRefCellDoublyLinkedListNode<T>> {
         if self.next.is_some() {
             let new_next=std::rc::Rc::new(std::cell::RefCell::new(DoublyLinkedListNode::<T> {
@@ -2880,14 +2898,14 @@ impl<T> DoublyLinkedListNode<T> {
             None
         }
     }
-    /// このノードをリストから削除する関数（返り値はこのノードが削除できるかどうか）
-    pub fn remove(&self) -> bool {
+    /// このノードをリストから削除し、ノードの値の所有権を移す関数（返り値はノードの値のOption）
+    pub fn remove(&mut self) -> Option<T> {
         if self.val.is_some() {
             self.prev.clone().unwrap().borrow_mut().next=self.next.clone();
             self.next.clone().unwrap().borrow_mut().prev=self.prev.clone();
-            true
+            std::mem::replace(&mut self.val, None)
         } else {
-            false
+            None
         }
     }
 }
@@ -2960,19 +2978,19 @@ impl<T> DoublyLinkedList<T> {
         Self { begin, end }
     }
     /// 先頭のノードがあれば返す関数（返り値はノードのRefCellのRcのOptionであることに注意）
-    pub fn first(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
-        let first=self.begin.borrow().next.clone().unwrap();
-        if first.borrow().val.is_some() {
-            Some(first)
+    pub fn front(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        let front=self.begin.borrow().next.clone().unwrap();
+        if front.borrow().val.is_some() {
+            Some(front)
         } else {
             None
         }
     }
     /// 末尾のノードがあれば返す関数（返り値はノードのRefCellのRcのOptionであることに注意）
-    pub fn last(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
-        let last=self.end.borrow().prev.clone().unwrap();
-        if last.borrow().val.is_some() {
-            Some(last)
+    pub fn back(&self) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        let back=self.end.borrow().prev.clone().unwrap();
+        if back.borrow().val.is_some() {
+            Some(back)
         } else {
             None
         }
@@ -2984,6 +3002,30 @@ impl<T> DoublyLinkedList<T> {
     /// 末尾の番兵を返す関数（返り値はノードのRefCellのRcであることに注意）
     pub fn end_sentinel(&self) -> RcRefCellDoublyLinkedListNode<T> {
         self.end.clone()
+    }
+    /// リストの先頭にノードを追加する関数（返り値は追加したノードのRefCellのRcのOptionであることに注意）
+    pub fn push_front(&self, val: T) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        self.begin_sentinel().borrow_mut().insert_next(val)
+    }
+    /// リストの末尾にノードを追加する関数（返り値は追加したノードのRefCellのRcのOptionであることに注意）
+    pub fn push_back(&self, val: T) -> Option<RcRefCellDoublyLinkedListNode<T>> {
+        self.end_sentinel().borrow_mut().insert_prev(val)
+    }
+    /// リストの先頭のノードを削除し、ノードの値の所有権を移す関数（返り値はノードの値のOption）
+    pub fn pop_front(&self) -> Option<T> {
+        if let Some(front)=self.front() {
+            front.borrow_mut().remove()
+        } else {
+            None
+        }
+    }
+    /// リストの末尾のノードを削除し、ノードの値の所有権を移す関数（返り値はノードの値のOption）
+    pub fn pop_back(&self) -> Option<T> {
+        if let Some(back)=self.back() {
+            back.borrow_mut().remove()
+        } else {
+            None
+        }
     }
     /// イテレータを返す関数
     pub fn iter(&self) -> DoublyLinkedListIter<T> {
@@ -4098,7 +4140,7 @@ impl Nimber for Vec<usize> {
 pub trait PrefixXOR {
     /// 累積XORのベクターを構築する関数（kが0の場合は通常の累積XOR、k>0の場合はk個以下の個数制限ありのNimber）
     fn construct_prefix_xor(&self, k: usize) -> Self;
-    /// 構築した累積XORのベクターから部分XORを計算する関数（0-indexedの左閉右開区間）
+    /// 構築した累積XORのベクターから部分XORを計算する関数（0-basedの左閉右開区間）
     fn calculate_partial_xor(&self, l: usize, r: usize) -> Self::Output where Self: std::ops::Index<usize>;
 }
 
@@ -4764,7 +4806,7 @@ pub struct RollingHash<const N: usize> {
 }
 
 impl<const N: usize> RollingHash<N> {
-    /// ハッシュの累積和と基数およびその逆元から部分列のローリングハッシュを返す関数（0-indexedの左閉右開区間）
+    /// ハッシュの累積和と基数およびその逆元から部分列のローリングハッシュを返す関数（0-basedの左閉右開区間）
     pub fn rolling_hash_of_subsequence(&self, l: usize, r: usize, b: &RollingHashBases<N>) -> [usize;N] {
         let mut hash=[0;N];
         for i in 0..N {
@@ -4779,7 +4821,7 @@ impl<const N: usize> RollingHash<N> {
         }
         hash
     }
-    /// ハッシュの累積和と基数およびその逆元から部分列を結合した列のローリングハッシュを返す関数（0-indexedの左閉右開区間）
+    /// ハッシュの累積和と基数およびその逆元から部分列を結合した列のローリングハッシュを返す関数（0-basedの左閉右開区間）
     pub fn sum_of_rolling_hash_of_subsequences(&self, ranges: &Vec<(usize,usize)>, b: &RollingHashBases<N>) -> [usize;N] {
         let mut hash=[0;N];
         let mut tmp=[0;N];
@@ -4903,7 +4945,7 @@ impl FunctionalGraph for Vec<usize> {
 
 /// ダブリングのトレイト
 pub trait Doubling where Self: Sized + std::ops::Index<usize>, Self::Output: std::ops::Index<usize> {
-    /// FunctionalGraphでstartからcnt回移動した先を返す関数（0-indexed）
+    /// FunctionalGraphでstartからcnt回移動した先を返す関数（0-based）
     fn terminus(&self, start: usize, cnt: usize) -> <Self::Output as std::ops::Index<usize>>::Output;
 }
 
@@ -4962,7 +5004,7 @@ impl LCASegtree for ac_library::Segtree<LCAMonoid> {
     }
 }
 
-/// 重みつきUnion-Findの構造体（重みの型はisize）（0-indexed）
+/// 重みつきUnion-Findの構造体（重みの型はisize）（0-based）
 #[derive(Clone, Debug)]
 pub struct WeightedDSU {
     parents: Vec<isize>,
@@ -5021,7 +5063,7 @@ impl WeightedDSU {
     }
 }
 
-/// Undo可能Union-Findの構造体（0-indexed）
+/// Undo可能Union-Findの構造体（0-based）
 #[derive(Clone, Debug)]
 pub struct DSUWithRollback {
     parents: Vec<isize>,
@@ -5250,7 +5292,7 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     fn berlekamp_massey(&self) -> Self;
     /// Bostan-Moriアルゴリズムを行う関数
     fn bostan_mori(p: &Self, q: &Self, k: usize) -> Self::Output;
-    /// 線形回帰数列の第n項を求める関数（0-indexed）
+    /// 線形回帰数列の第n項を求める関数（0-based）
     fn calculate_nth_term(&self, n: usize, berlekamp_massey: &Self) -> Self::Output;
 }
 
@@ -5829,9 +5871,9 @@ pub fn mo_s_algorithm(n: usize, queries: &Vec<(usize,usize)>) -> impl Iterator<I
 
 /// プリューファーコードのトレイト
 pub trait PrueferCode {
-    /// プリューファーコードの表すラベルつき木のVecGraphを返す関数（0-indexed）
+    /// プリューファーコードの表すラベルつき木のVecGraphを返す関数（0-based）
     fn labeled_tree_vec(&self) -> VecGraph;
-    /// プリューファーコードの表すラベルつき木のMapGraphを返す関数（0-indexed）
+    /// プリューファーコードの表すラベルつき木のMapGraphを返す関数（0-based）
     fn labeled_tree_map(&self) -> MapGraph;
 }
 
@@ -6972,7 +7014,7 @@ impl LiChaoTree {
     }
 }
 
-/// 部分永続Union-Findの構造体（0-indexed）
+/// 部分永続Union-Findの構造体（0-based）
 #[derive(Clone, Debug)]
 pub struct PartiallyPersistentDSU {
     parents: Vec<Vec<(usize,isize)>>,
@@ -7039,7 +7081,7 @@ impl ac_library::Monoid for PersistentDSUOperation {
     }
 }
 
-/// 完全永続Union-Findの構造体（0-indexed）
+/// 完全永続Union-Findの構造体（0-based）
 pub struct FullyPersistentDSU {
     parents: PersistentSegtree<PersistentDSUOperation>,
     numbers: Vec<usize>
@@ -7097,13 +7139,13 @@ impl FullyPersistentDSU {
 
 /// 単一の文字を数値に変換する関数のトレイト
 pub trait FromChar {
-    /// 文字を数値に変換する関数（0-indexedの閉区間）
+    /// 文字を数値に変換する関数（0-basedの閉区間）
     fn from_foo(self, begin: char, end: char) -> usize;
     /// 数字（文字）を1桁の数値に変換する関数
     fn from_fig(self) -> usize;
-    /// 大文字のアルファベットを1桁の数値に変換する関数（0-indexed）
+    /// 大文字のアルファベットを1桁の数値に変換する関数（0-based）
     fn from_uppercase(self) -> usize;
-    /// 小文字のアルファベットを1桁の数値に変換する関数（0-indexed）
+    /// 小文字のアルファベットを1桁の数値に変換する関数（0-based）
     fn from_lowercase(self) -> usize;
 }
 
@@ -7128,13 +7170,13 @@ impl FromChar for char {
 
 /// 数値を単一の文字に変換する関数のトレイト
 pub trait ToChar {
-    /// 数値を文字に変換する関数（0-indexed）
+    /// 数値を文字に変換する関数（0-based）
     fn to_foo(self, begin: char, width: usize) -> char;
     /// 1桁の数値を数字（文字）に変換する関数
     fn to_fig(self) -> char;
-    /// 1桁の数値を大文字のアルファベットに変換する関数（0-indexed）
+    /// 1桁の数値を大文字のアルファベットに変換する関数（0-based）
     fn to_uppercase(self) -> char;
-    /// 1桁の数値を小文字のアルファベットに変換する関数（0-indexed）
+    /// 1桁の数値を小文字のアルファベットに変換する関数（0-based）
     fn to_lowercase(self) -> char;
 }
 
@@ -7169,9 +7211,9 @@ impl ToDecimal for String {
     }
 }
 
-/// 2進法で0-indexedでの桁数を求めるトレイト（厳密にはその数以下の最大の2冪の2底logの値）
+/// 2進法で0-basedでの桁数を求めるトレイト（厳密にはその数以下の最大の2冪の2底logの値）
 pub trait BitDigits {
-    /// 2進法で0-indexedでの桁数を求める関数（厳密にはその数以下の最大の2冪の2底logの値）
+    /// 2進法で0-basedでの桁数を求める関数（厳密にはその数以下の最大の2冪の2底logの値）
     fn bit_digits(self) -> usize;
 }
 
