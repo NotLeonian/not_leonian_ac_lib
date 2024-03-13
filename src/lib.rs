@@ -210,12 +210,141 @@ pub trait OutputValOr {
     fn output_val_or(self, max: Self);
 }
 
-impl OutputValOr for usize {
+impl<T> OutputValOr for T where T: std::fmt::Display + PartialOrd {
     fn output_val_or(self, max: Self) {
         if self<max {
             println!("{}",self);
         } else {
             println!("-1");
+        }
+    }
+}
+
+/// 配列やベクターの中身について1行で、存在すれば値を、存在しなければ-1を出力するトレイト
+pub trait OutputlnValOr where Self: std::ops::Index<usize> {
+    /// 配列やベクターの中身について1行で、値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
+    fn outputln_val_or(&self, max: Self::Output);
+}
+
+impl<T> OutputlnValOr for Vec<T> where T: std::fmt::Display + PartialOrd {
+    fn outputln_val_or(&self, max: T) {
+        for (i,var) in self.iter().enumerate() {
+            if *var<max {
+                if i<self.len()-1 {
+                    print!("{} ",&var);
+                } else {
+                    print!("{}",&var);
+                }
+            } else {
+                if i<self.len()-1 {
+                    print!("{} ",-1);
+                } else {
+                    print!("{}",-1);
+                }
+            }
+        }
+        println!();
+    }
+}
+
+impl<T> OutputlnValOr for [T] where T: std::fmt::Display + PartialOrd {
+    fn outputln_val_or(&self, max: T) {
+        for (i,var) in self.iter().enumerate() {
+            if *var<max {
+                if i<self.len()-1 {
+                    print!("{} ",&var);
+                } else {
+                    print!("{}",&var);
+                }
+            } else {
+                if i<self.len()-1 {
+                    print!("{} ",-1);
+                } else {
+                    print!("{}",-1);
+                }
+            }
+        }
+        println!();
+    }
+}
+
+impl<T, const N: usize> OutputlnValOr for [T;N] where T: Sized + std::fmt::Display + PartialOrd {
+    fn outputln_val_or(&self, max: T) {
+        for (i,var) in self.iter().enumerate() {
+            if *var<max {
+                if i<N-1 {
+                    print!("{} ",&var);
+                } else {
+                    print!("{}",&var);
+                }
+            } else {
+                if i<N-1 {
+                    print!("{} ",-1);
+                } else {
+                    print!("{}",-1);
+                }
+            }
+        }
+        println!();
+    }
+}
+
+/// 配列やベクターの中身について複数行で、存在すれば値を、存在しなければ-1を出力するトレイト
+pub trait OutputlnsValOr where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize> {
+    /// 配列やベクターの中身について複数行で、値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
+    fn outputlns_val_or(&self, max: <Self::Output as std::ops::Index<usize>>::Output);
+}
+
+impl<T> OutputlnsValOr for Vec<T> where T: OutputlnValOr, T::Output: Clone {
+    fn outputlns_val_or(&self, max: T::Output) {
+        for v in self {
+            v.outputln_val_or(max.clone());
+        }
+    }
+}
+
+impl<T> OutputlnsValOr for [T] where T: OutputlnValOr, T::Output: Clone {
+    fn outputlns_val_or(&self, max: T::Output) {
+        for v in self {
+            v.outputln_val_or(max.clone());
+        }
+    }
+}
+
+impl<T, const N: usize> OutputlnsValOr for [T;N] where T: OutputlnValOr, T::Output: Clone {
+    fn outputlns_val_or(&self, max: T::Output) {
+        for v in self {
+            v.outputln_val_or(max.clone());
+        }
+    }
+}
+
+/// 配列やベクターの中身について改行しながら、存在すれば値を、存在しなければ-1を出力するトレイト
+pub trait OutputLnsValOr where Self: std::ops::Index<usize> {
+    /// 配列やベクターの中身について改行しながら、値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
+    fn outputlns_val_or(&self, max: Self::Output);
+}
+
+impl<T> OutputLnsValOr for Vec<T> where T: Clone + OutputValOr {
+    fn outputlns_val_or(&self, max: T) {
+        for var in self {
+            var.clone().output_val_or(max.clone());
+        }
+    }
+}
+
+impl<T> OutputLnsValOr for [T] where T: Clone + OutputValOr {
+    fn outputlns_val_or(&self, max: T) {
+        for var in self {
+            var.clone().output_val_or(max.clone());
+        }
+    }
+}
+
+impl<T, const N: usize> OutputLnsValOr for [T;N] where T: Clone + OutputValOr {
+    fn outputlns_val_or(&self, max: T) {
+        for var in self {
+            var.clone().output_val_or(max.clone());
         }
     }
 }
@@ -480,14 +609,157 @@ pub trait EoutputValOr {
     fn eoutput_val_or(self, max: Self);
 }
 
-impl EoutputValOr for usize {
-    #[allow(unused_variables)]
+impl<T> EoutputValOr for T where T: std::fmt::Display + PartialOrd {
     fn eoutput_val_or(self, max: Self) {
         #[cfg(debug_assertions)]
         if self<max {
             eprintln!("{}",self);
         } else {
             eprintln!("-1");
+        }
+    }
+}
+
+/// 配列やベクターの中身について1行で、存在すれば値を、存在しなければ-1をstderrに出力するトレイト
+pub trait EoutputlnValOr where Self: std::ops::Index<usize> {
+    /// 配列やベクターの中身について1行で、値がmaxより小さければ自身を出力し、maxであれば-1をstderrに出力する関数
+    fn eoutputln_val_or(&self, max: Self::Output);
+}
+
+impl<T> EoutputlnValOr for Vec<T> where T: std::fmt::Display + PartialOrd {
+    fn eoutputln_val_or(&self, max: T) {
+        #[cfg(debug_assertions)]
+        {
+            for (i,var) in self.iter().enumerate() {
+                if *var<max {
+                    if i<self.len()-1 {
+                        eprint!("{} ",&var);
+                    } else {
+                        eprint!("{}",&var);
+                    }
+                } else {
+                    if i<self.len()-1 {
+                        eprint!("{} ",-1);
+                    } else {
+                        eprint!("{}",-1);
+                    }
+                }
+            }
+            eprintln!();
+        }
+    }
+}
+
+impl<T> EoutputlnValOr for [T] where T: std::fmt::Display + PartialOrd {
+    fn eoutputln_val_or(&self, max: T) {
+        #[cfg(debug_assertions)]
+        {
+            for (i,var) in self.iter().enumerate() {
+                if *var<max {
+                    if i<self.len()-1 {
+                        eprint!("{} ",&var);
+                    } else {
+                        eprint!("{}",&var);
+                    }
+                } else {
+                    if i<self.len()-1 {
+                        eprint!("{} ",-1);
+                    } else {
+                        eprint!("{}",-1);
+                    }
+                }
+            }
+            eprintln!();
+        }
+    }
+}
+
+impl<T, const N: usize> EoutputlnValOr for [T;N] where T: Sized + std::fmt::Display + PartialOrd {
+    fn eoutputln_val_or(&self, max: T) {
+        #[cfg(debug_assertions)]
+        {
+            for (i,var) in self.iter().enumerate() {
+                if *var<max {
+                    if i<N-1 {
+                        eprint!("{} ",&var);
+                    } else {
+                        eprint!("{}",&var);
+                    }
+                } else {
+                    if i<N-1 {
+                        eprint!("{} ",-1);
+                    } else {
+                        eprint!("{}",-1);
+                    }
+                }
+            }
+            eprintln!();
+        }
+    }
+}
+
+/// 配列やベクターの中身について複数行で、存在すれば値を、存在しなければ-1をstderrに出力するトレイト
+pub trait EoutputlnsValOr where Self: std::ops::Index<usize>, Self::Output: std::ops::Index<usize> {
+    /// 配列やベクターの中身について複数行で、値がmaxより小さければ自身を出力し、maxであれば-1をstderrに出力する関数
+    fn eoutputlns_val_or(&self, max: <Self::Output as std::ops::Index<usize>>::Output);
+}
+
+impl<T> EoutputlnsValOr for Vec<T> where T: EoutputlnValOr, <T as std::ops::Index<usize>>::Output: Clone {
+    fn eoutputlns_val_or(&self, max: T::Output) {
+        #[cfg(debug_assertions)]
+        for v in self {
+            v.eoutputln_val_or(max.clone());
+        }
+    }
+}
+
+impl<T> EoutputlnsValOr for [T] where T: EoutputlnValOr, <T as std::ops::Index<usize>>::Output: Clone {
+    fn eoutputlns_val_or(&self, max: T::Output) {
+        #[cfg(debug_assertions)]
+        for v in self {
+            v.eoutputln_val_or(max.clone());
+        }
+    }
+}
+
+impl<T, const N: usize> EoutputlnsValOr for [T;N] where T: EoutputlnValOr, <T as std::ops::Index<usize>>::Output: Clone {
+    fn eoutputlns_val_or(&self, max: T::Output) {
+        #[cfg(debug_assertions)]
+        for v in self {
+            v.eoutputln_val_or(max.clone());
+        }
+    }
+}
+
+/// 配列やベクターの中身について改行しながら、存在すれば値を、存在しなければ-1をstderrに出力するトレイト
+pub trait EoutputLnsValOr where Self: std::ops::Index<usize> {
+    /// 配列やベクターの中身について改行しながら、値がmaxより小さければ自身を出力し、maxであれば-1をstderrに出力する関数
+    fn eoutputlns_val_or(&self, max: Self::Output);
+}
+
+impl<T> EoutputLnsValOr for Vec<T> where T: Clone + EoutputValOr {
+    fn eoutputlns_val_or(&self, max: T) {
+        #[cfg(debug_assertions)]
+        for var in self {
+            var.clone().eoutput_val_or(max.clone());
+        }
+    }
+}
+
+impl<T> EoutputLnsValOr for [T] where T: Clone + EoutputValOr {
+    fn eoutputlns_val_or(&self, max: T) {
+        #[cfg(debug_assertions)]
+        for var in self {
+            var.clone().eoutput_val_or(max.clone());
+        }
+    }
+}
+
+impl<T, const N: usize> EoutputLnsValOr for [T;N] where T: Clone + EoutputValOr {
+    fn eoutputlns_val_or(&self, max: T) {
+        #[cfg(debug_assertions)]
+        for var in self {
+            var.clone().eoutput_val_or(max.clone());
         }
     }
 }
