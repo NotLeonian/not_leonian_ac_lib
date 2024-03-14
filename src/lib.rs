@@ -6076,6 +6076,67 @@ impl<M> SparseFPS for Vec<(usize,ac_library::StaticModInt<M>)> where M: ac_libra
     }
 }
 
+/// 部分集合のXORのうち最大の非負整数を返すトレイト
+pub trait SubsetXORMax where Self: std::ops::Index<usize> {
+    /// 部分集合のXORのうち最大の非負整数を返す関数
+    fn subset_xor_max(&self) -> Self::Output;
+}
+
+impl<T> SubsetXORMax for Vec<T> where T: num::PrimInt + std::ops::BitXorAssign {
+    fn subset_xor_max(&self) -> T {
+        let mut vec=self.clone();
+        let mut idx=0;
+        for d in (0..T::zero().leading_zeros() as usize).rev() {
+            let mut max=T::zero();
+            let mut max_idx=idx;
+            for i in idx..vec.len() {
+                if vec[i]>=(T::one()<<d) && vec[i]>max {
+                    max=vec[i];
+                    max_idx=i;
+                }
+            }
+            if max==T::zero() {
+                continue;
+            }
+            vec.swap(idx, max_idx);
+            for i in 0..vec.len() {
+                if i!=idx && (vec[i]&(T::one()<<d))>T::zero() {
+                    let tmp=vec[idx];
+                    vec[i]^=tmp;
+                }
+            }
+            idx+=1;
+        }
+        let mut ret=T::zero();
+        for &val in &vec {
+            ret^=val;
+        }
+        ret
+    }
+}
+
+/// 非負整数とそのXORをF2上のベクトル空間と見たときの、与えられた集合のなす部分空間の基底（俗に言うnoshi基底）を返すトレイト
+pub trait XORBasis {
+    /// 非負整数とそのXORをF2上のベクトル空間と見たときの、与えられた集合のなす部分空間の基底（俗に言うnoshi基底）を返す関数
+    fn xor_basis(&self) -> Self;
+}
+
+impl<T> XORBasis for Vec<T> where T: num::PrimInt {
+    fn xor_basis(&self) -> Self {
+        let mut basis=Vec::new();
+        for &e in self {
+            let mut e=e;
+            for &b in &basis {
+                e.chmin(e^b);
+            }
+            if e>T::zero() {
+                basis.push(e);
+            }
+        }
+        basis
+    }
+}
+
 /// Mo's Algorithmの区間の動き方の列挙型（順にクエリの番号と区間の左端と右端）
 /// （Fallが直接そのクエリに向かう動き方、Lengthenは区間が長くなる動き方、LShortenは区間が短くなる動き方で返される左端は消える点であることに注意）
 pub enum MoS {
