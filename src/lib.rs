@@ -610,6 +610,7 @@ pub trait EoutputValOr {
 }
 
 impl<T> EoutputValOr for T where T: std::fmt::Display + PartialOrd {
+    #[allow(unused_variables)]
     fn eoutput_val_or(self, max: Self) {
         #[cfg(debug_assertions)]
         if self<max {
@@ -627,6 +628,7 @@ pub trait EoutputlnValOr where Self: std::ops::Index<usize> {
 }
 
 impl<T> EoutputlnValOr for Vec<T> where T: std::fmt::Display + PartialOrd {
+    #[allow(unused_variables)]
     fn eoutputln_val_or(&self, max: T) {
         #[cfg(debug_assertions)]
         {
@@ -651,6 +653,7 @@ impl<T> EoutputlnValOr for Vec<T> where T: std::fmt::Display + PartialOrd {
 }
 
 impl<T> EoutputlnValOr for [T] where T: std::fmt::Display + PartialOrd {
+    #[allow(unused_variables)]
     fn eoutputln_val_or(&self, max: T) {
         #[cfg(debug_assertions)]
         {
@@ -675,6 +678,7 @@ impl<T> EoutputlnValOr for [T] where T: std::fmt::Display + PartialOrd {
 }
 
 impl<T, const N: usize> EoutputlnValOr for [T;N] where T: Sized + std::fmt::Display + PartialOrd {
+    #[allow(unused_variables)]
     fn eoutputln_val_or(&self, max: T) {
         #[cfg(debug_assertions)]
         {
@@ -705,6 +709,7 @@ pub trait EoutputlnsValOr where Self: std::ops::Index<usize>, Self::Output: std:
 }
 
 impl<T> EoutputlnsValOr for Vec<T> where T: EoutputlnValOr, <T as std::ops::Index<usize>>::Output: Clone {
+    #[allow(unused_variables)]
     fn eoutputlns_val_or(&self, max: T::Output) {
         #[cfg(debug_assertions)]
         for v in self {
@@ -714,6 +719,7 @@ impl<T> EoutputlnsValOr for Vec<T> where T: EoutputlnValOr, <T as std::ops::Inde
 }
 
 impl<T> EoutputlnsValOr for [T] where T: EoutputlnValOr, <T as std::ops::Index<usize>>::Output: Clone {
+    #[allow(unused_variables)]
     fn eoutputlns_val_or(&self, max: T::Output) {
         #[cfg(debug_assertions)]
         for v in self {
@@ -723,6 +729,7 @@ impl<T> EoutputlnsValOr for [T] where T: EoutputlnValOr, <T as std::ops::Index<u
 }
 
 impl<T, const N: usize> EoutputlnsValOr for [T;N] where T: EoutputlnValOr, <T as std::ops::Index<usize>>::Output: Clone {
+    #[allow(unused_variables)]
     fn eoutputlns_val_or(&self, max: T::Output) {
         #[cfg(debug_assertions)]
         for v in self {
@@ -738,6 +745,7 @@ pub trait EoutputLnsValOr where Self: std::ops::Index<usize> {
 }
 
 impl<T> EoutputLnsValOr for Vec<T> where T: Clone + EoutputValOr {
+    #[allow(unused_variables)]
     fn eoutputlns_val_or(&self, max: T) {
         #[cfg(debug_assertions)]
         for var in self {
@@ -747,6 +755,7 @@ impl<T> EoutputLnsValOr for Vec<T> where T: Clone + EoutputValOr {
 }
 
 impl<T> EoutputLnsValOr for [T] where T: Clone + EoutputValOr {
+    #[allow(unused_variables)]
     fn eoutputlns_val_or(&self, max: T) {
         #[cfg(debug_assertions)]
         for var in self {
@@ -756,6 +765,7 @@ impl<T> EoutputLnsValOr for [T] where T: Clone + EoutputValOr {
 }
 
 impl<T, const N: usize> EoutputLnsValOr for [T;N] where T: Clone + EoutputValOr {
+    #[allow(unused_variables)]
     fn eoutputlns_val_or(&self, max: T) {
         #[cfg(debug_assertions)]
         for var in self {
