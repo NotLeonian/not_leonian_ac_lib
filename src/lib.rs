@@ -966,9 +966,9 @@ impl<T> GetMutFromLast for std::collections::VecDeque<T> {
     }
 }
 
-/// for文風にbeginからendまでの結果を格納したベクターを生成する関数（0-basedの左閉右開区間）
-pub fn vec_range<N,F,T>(begin: N, end: N, func: F) -> Vec<T> where std::ops::Range<N>: Iterator, F: Fn(<std::ops::Range<N> as Iterator>::Item) -> T {
-    (begin..end).map(|i| func(i)).collect::<Vec::<T>>()
+/// イテレータrangeから生成されるそれぞれの値についてfuncが返す値のベクターを生成する関数（rangeはイテレータならばRange以外でもよい）
+pub fn vec_range<I,F,T>(range: I, func: F) -> Vec<T> where I: Iterator, F: Fn(I::Item) -> T {
+    range.map(|i| func(i)).collect::<Vec::<T>>()
 }
 
 /// ベクターの先頭にfilledを追加してmだけ右にずらす関数のトレイト
@@ -1245,7 +1245,7 @@ impl TwoDimGrid {
     }
     /// charsで表される、大きさh×wの2次元グリッドを構築する関数（wallは進めないマスを表す文字で、is_torusは上下および左右が繋がっているかどうか）
     pub fn construct_grid_from_chars(h: usize, w:usize, chars: &Vec<Vec<char>>, wall: char, is_torus: bool) -> Self {
-        let grid=vec_range(0, h, |i| vec_range(0, w, |j| chars[i][j]!=wall));
+        let grid=vec_range(0..h, |i| vec_range(0..w, |j| chars[i][j]!=wall));
         Self { h, w, grid, is_torus }
     }
     /// 与えられたマスが進めないマスでないかを返す関数
@@ -4536,13 +4536,13 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         let mut left_set=vec![e];
         for i in 0..mid {
             let left_1=std::mem::take(&mut left_set);
-            let left_2=vec_range(0, 1<<i, |j| sum(left_1[j],self[i]));
+            let left_2=vec_range(0..(1<<i), |j| sum(left_1[j],self[i]));
             left_set=merge_vecs(&left_1, &left_2);
         }
         let mut right_set=vec![e];
         for i in 0..len-mid {
             let right_1=std::mem::take(&mut right_set);
-            let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
+            let right_2=vec_range(0..(1<<i), |j| sum(right_1[j],self[mid+i]));
             right_set=merge_vecs(&right_1, &right_2);
         }
         for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
@@ -4562,13 +4562,13 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         let mut left_set=vec![e];
         for i in 0..mid {
             let left_1=std::mem::take(&mut left_set);
-            let left_2=vec_range(0, 1<<i, |j| sum(left_1[j],self[i]));
+            let left_2=vec_range(0..(1<<i), |j| sum(left_1[j],self[i]));
             left_set=merge_vecs(&left_1, &left_2);
         }
         let mut right_set=vec![e];
         for i in 0..len-mid {
             let right_1=std::mem::take(&mut right_set);
-            let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
+            let right_2=vec_range(0..(1<<i), |j| sum(right_1[j],self[mid+i]));
             right_set=merge_vecs(&right_1, &right_2);
         }
         let mut ans=None;
@@ -4594,13 +4594,13 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         let mut left_set=vec![e];
         for i in 0..mid {
             let left_1=std::mem::take(&mut left_set);
-            let left_2=vec_range(0, 1<<i, |j| sum(left_1[j],self[i]));
+            let left_2=vec_range(0..(1<<i), |j| sum(left_1[j],self[i]));
             left_set=merge_vecs(&left_1, &left_2);
         }
         let mut right_set=vec![e];
         for i in 0..len-mid {
             let right_1=std::mem::take(&mut right_set);
-            let right_2=vec_range(0, 1<<i, |j| sum(right_1[j],self[mid+i]));
+            let right_2=vec_range(0..(1<<i), |j| sum(right_1[j],self[mid+i]));
             right_set=merge_vecs(&right_1, &right_2);
         }
         let mut ans=None;
@@ -4626,13 +4626,13 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
         let mut left_set=vec![(e,0usize)];
         for i in 0..mid {
             let left_1=std::mem::take(&mut left_set);
-            let left_2=vec_range(0, 1<<i, |j| (sum(left_1[j].0,self[i]),left_1[j].1+(1<<i)));
+            let left_2=vec_range(0..(1<<i), |j| (sum(left_1[j].0,self[i]),left_1[j].1+(1<<i)));
             left_set=merge_vecs(&left_1, &left_2);
         }
         let mut right_set=vec![(e,0usize)];
         for i in 0..len-mid {
             let right_1=std::mem::take(&mut right_set);
-            let right_2=vec_range(0, 1<<i, |j| (sum(right_1[j].0,self[mid+i]),right_1[j].1+(1<<(mid+i))));
+            let right_2=vec_range(0..(1<<i), |j| (sum(right_1[j].0,self[mid+i]),right_1[j].1+(1<<(mid+i))));
             right_set=merge_vecs(&right_1, &right_2);
         }
         for (l,r) in two_pointers(left_set.len(), right_set.len(), false, true, &|i,j| {
