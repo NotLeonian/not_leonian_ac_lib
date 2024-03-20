@@ -5530,6 +5530,8 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     fn fps_mul_assign(&mut self, g: &Self, deg: usize);
     /// 形式的冪級数の積を返す関数
     fn fps_mul(f: &Self, g: &Self, deg: usize) -> Self;
+    /// 形式的冪級数の逆元を割り当てる関数
+    fn fps_inv_assign(&mut self, deg: usize);
     /// 形式的冪級数の逆元を返す関数
     fn fps_inv(&self, deg: usize) -> Self;
     /// 形式的冪級数の商を割り当てる関数
@@ -5576,6 +5578,18 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     fn bostan_mori(p: &Self, q: &Self, k: usize) -> Self::Output;
     /// 線形回帰数列の第n項を求める関数（0-based）
     fn calculate_nth_term(&self, n: usize, berlekamp_massey: &Self) -> Self::Output;
+    /// 形式的冪級数の0乗から(n-1)乗について、それぞれのk次の係数を返す関数
+    /// <https://noshi91.hatenablog.com/entry/2024/03/16/224034>
+    fn fps_pow_coefficients(&self, n: usize, k: usize) -> Self;
+    /// 形式的冪級数の逆関数を割り当てる関数
+    fn fps_comp_inv_assign(&mut self, deg: usize);
+    /// 形式的冪級数の逆関数を返す関数
+    fn fps_comp_inv(&self, deg: usize) -> Self;
+    /// 形式的冪級数の合成self(g(x))を割り当てる関数
+    fn fps_comp_assign(&mut self, g: &Self, deg: usize);
+    /// 形式的冪級数の合成f(g(x))を返す関数
+    /// <https://qiita.com/ryuhe1/items/23d79bb84b270f7359e0>
+    fn fps_comp(f: &Self, g: &Self, deg: usize) -> Self;
 }
 
 impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
@@ -5631,6 +5645,10 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     fn fps_mul(f: &Self, g: &Self, deg: usize) -> Self {
         debug_assert!(f.len()+g.len()-1>deg);
         ac_library::convolution::convolution(&f[0..], &g[0..])[0..=deg].to_vec()
+    }
+    fn fps_inv_assign(&mut self, deg: usize) {
+        debug_assert!(self.len()>deg);
+        *self=self.fps_inv(deg);
     }
     fn fps_inv(&self, deg: usize) -> Self {
         debug_assert!(self.len()>deg);
@@ -5944,6 +5962,196 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         }
         let p=Self::fps_mul(&self.fps_prefix(berlekamp_massey.len()-1), berlekamp_massey, berlekamp_massey.len().saturating_sub(2));
         Self::bostan_mori(&p, berlekamp_massey, n)
+    }
+    fn fps_pow_coefficients(&self, n: usize, k: usize) -> Self {
+        let mut p=vec![vec![ac_library::StaticModInt::<M>::new(1)]];
+        let mut q=vec![vec![];min(self.len(),k+1)];
+        q[0]=vec![ac_library::StaticModInt::<M>::new(1),-self[0]];
+        for i in 1..min(self.len(),k+1) {
+            q[i]=vec![ac_library::StaticModInt::<M>::new(0),-self[i]];
+        }
+        let mut k=k;
+        let mut y_deg=1;
+        while k>0 {
+            let mut g=q.clone();
+            for i in (1..g.len()).step_by(2) {
+                for j in 0..g[i].len() {
+                    g[i][j]*=-1;
+                }
+            }
+            let next_len=max(p.len(),q.len())+g.len()-1;
+            let mut g_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(y_deg+1)];
+            for i in 0..g.len() {
+                for j in 0..g[i].len() {
+                    g_1d[i+next_len*j]=g[i][j];
+                }
+            }
+            let mut p_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(y_deg+1)];
+            for i in 0..p.len() {
+                for j in 0..p[i].len() {
+                    p_1d[i+next_len*j]=p[i][j];
+                }
+            }
+            let conv=ac_library::convolution(&p_1d, &g_1d);
+            p.resize(min((next_len-k%2+1)/2,k/2+1), vec![]);
+            for i in 0..p.len() {
+                let mut deg=0;
+                for j in 0..min(y_deg*2+1,n) {
+                    if conv[i*2+k%2+next_len*j]!=ac_library::StaticModInt::<M>::new(0) {
+                        deg=j;
+                    }
+                }
+                p[i].resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+                for j in 0..=deg {
+                    p[i][j]=conv[i*2+k%2+next_len*j];
+                }
+            }
+            let mut q_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(y_deg+1)];
+            for i in 0..q.len() {
+                for j in 0..q[i].len() {
+                    q_1d[i+next_len*j]=q[i][j];
+                }
+            }
+            let conv=ac_library::convolution(&q_1d, &g_1d);
+            q.resize(min((next_len+1)/2,k/2+1), vec![]);
+            for i in 0..q.len() {
+                let mut deg=0;
+                for j in 0..min(y_deg*2+1,n) {
+                    if conv[i*2+next_len*j]!=ac_library::StaticModInt::<M>::new(0) {
+                        deg=j;
+                    }
+                }
+                q[i].resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+                for j in 0..=deg {
+                    q[i][j]=conv[i*2+next_len*j];
+                }
+            }
+            k/=2;
+            y_deg*=2;
+        }
+        Self::fps_div(&p[0], &q[0], min(p[0].len()+q[0].len()-2,n-1)).fps_prefix(n)
+    }
+    fn fps_comp_inv_assign(&mut self, deg: usize) {
+        *self=self.fps_comp_inv(deg);
+    }
+    fn fps_comp_inv(&self, deg: usize) -> Self {
+        let cinv=self[1].inv();
+        let f=self.fps_scalar(cinv.val() as isize).fps_pow_coefficients(deg+1, deg);
+        let mut g=vec![ac_library::StaticModInt::<M>::new(0);deg];
+        for i in 1..=deg {
+            g[deg-i]=f[i]/i*deg;
+        }
+        g.fps_pow_assign(ac_library::StaticModInt::<M>::new(deg).inv().val() as usize, deg-1);
+        g.fps_inv_assign(deg-1);
+        g.move_right(1, ac_library::StaticModInt::<M>::new(0));
+        let mut cinvpow=cinv;
+        for i in 1..=deg {
+            g[i]*=cinvpow;
+            cinvpow*=cinv;
+        }
+        g
+    }
+    fn fps_comp_assign(&mut self, g: &Self, deg: usize) {
+        *self=Self::fps_comp(self, g, deg);
+    }
+    fn fps_comp(f: &Self, g: &Self, deg: usize) -> Self {
+        let n=deg+1;
+        let mut q=vec![vec![];min(g.len(),n)];
+        q[0]=vec![ac_library::StaticModInt::<M>::new(1),-g[0]];
+        for i in 1..min(g.len(),n) {
+            q[i]=vec![ac_library::StaticModInt::<M>::new(0),-g[i]];
+        }
+        let mut k=deg;
+        let mut y_deg=1;
+        let mut stack=vec![];
+        while k>0 {
+            let mut g=q.clone();
+            for i in (1..g.len()).step_by(2) {
+                for j in 0..g[i].len() {
+                    g[i][j]*=-1;
+                }
+            }
+            let next_len=q.len()+g.len()-1;
+            let mut g_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(y_deg+1)];
+            for i in 0..g.len() {
+                for j in 0..g[i].len() {
+                    g_1d[i+next_len*j]=g[i][j];
+                }
+            }
+            let mut q_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(y_deg+1)];
+            for i in 0..q.len() {
+                for j in 0..q[i].len() {
+                    q_1d[i+next_len*j]=q[i][j];
+                }
+            }
+            let conv=ac_library::convolution(&q_1d, &g_1d);
+            q.resize(min((next_len+1)/2,k/2+1), vec![]);
+            for i in 0..q.len() {
+                let mut deg=0;
+                for j in 0..min(y_deg*2+1,n) {
+                    if conv[i*2+next_len*j]!=ac_library::StaticModInt::<M>::new(0) {
+                        deg=j;
+                    }
+                }
+                q[i].resize(deg+1, ac_library::StaticModInt::<M>::new(0));
+                for j in 0..=deg {
+                    q[i][j]=conv[i*2+next_len*j];
+                }
+            }
+            stack.push((g,y_deg));
+            k/=2;
+            y_deg*=2;
+        }
+        let mut p=if n.count_ones()>1 {
+            let mut p=vec![vec![ac_library::StaticModInt::<M>::new(0);n+1]];
+            for i in 0..min(f.len(),n) {
+                p[0][n-i]=f[i];
+            }
+            p
+        } else {
+            let mut p=vec![vec![ac_library::StaticModInt::<M>::new(0);n]];
+            for i in 0..min(f.len(),n) {
+                p[0][n-i-1]=f[i];
+            }
+            p
+        };
+        while let Some((g,y_deg))=stack.pop() {
+            let next_len=p.len()*2+g.len()-2;
+            let mut g_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(min(y_deg*2,n)+1)];
+            for i in 0..g.len() {
+                for j in 0..g[i].len() {
+                    g_1d[i+next_len*j]=g[i][j];
+                }
+            }
+            let mut p_1d=vec![ac_library::StaticModInt::<M>::new(0);next_len*(min(y_deg*2,n)+1)];
+            for i in 0..p.len() {
+                for j in 0..p[i].len() {
+                    p_1d[i*2+next_len*j]=p[i][j];
+                }
+            }
+            let conv=ac_library::convolution(&p_1d, &g_1d);
+            p.resize(min(next_len,g.len()), vec![]);
+            let y_min=min(y_deg,n+1-y_deg);
+            for i in 0..p.len() {
+                let mut deg=y_min;
+                for j in y_min..y_min+y_deg {
+                    if conv[i+next_len*j]!=ac_library::StaticModInt::<M>::new(0) {
+                        deg=j;
+                    }
+                }
+                p[i].resize(deg-y_min+1, ac_library::StaticModInt::<M>::new(0));
+                for j in y_min..=deg {
+                    p[i][j-y_min]=conv[i+next_len*j];
+                }
+            }
+        }
+        let mut ans=vec![ac_library::StaticModInt::<M>::new(0);n];
+        for i in 0..min(n,p.len()) {
+            if p[i].len()>0 {
+                ans[i]=p[i][0];
+            }
+        }
+        ans
     }
 }
 
