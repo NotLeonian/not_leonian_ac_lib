@@ -6041,8 +6041,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         for i in 1..=deg {
             g[deg-i]=f[i]/i*deg;
         }
-        g.fps_pow_assign(ac_library::StaticModInt::<M>::new(deg).inv().val() as usize, deg-1);
-        g.fps_inv_assign(deg-1);
+        g.fps_pow_assign((-ac_library::StaticModInt::<M>::new(deg)).inv().val() as usize, deg-1);
         g.move_right(1, ac_library::StaticModInt::<M>::new(0));
         let mut cinvpow=cinv;
         for i in 1..=deg {
