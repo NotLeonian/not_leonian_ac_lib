@@ -774,9 +774,9 @@ impl<T, const N: usize> EoutputLnsValOr for [T;N] where T: Clone + EoutputValOr 
     }
 }
 
-/// 0(加法単位元)を定義するトレイト
+/// 0（加法単位元）を定義するトレイト
 pub trait ZeroElement {
-    /// 0(加法単位元)を返す関数
+    /// 0（加法単位元）を返す関数
     fn zero_element() -> Self;
 }
 
@@ -818,9 +818,9 @@ macro_rules! zero_element {
 
 zero_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
-/// 1(乗法単位元)を定義するトレイト
+/// 1（乗法単位元）を定義するトレイト
 pub trait OneElement {
-    /// 1(乗法単位元)を返す関数
+    /// 1（乗法単位元）を返す関数
     fn one_element() -> Self;
 }
 
@@ -3228,7 +3228,7 @@ pub trait Rig {
     fn multiplicative_identity() -> Self::S;
     /// 積を定義する関数
     fn mul(a: &Self::S, b: &Self::S) -> Self::S;
-
+    /// （基本的に定義しなくてよい）
     /// 連続部分列の要素の総積の総和を返す関数
     fn sum_of_subarray_products(a: &Vec<Self::S>) -> Self::S where Self::S: PartialEq {
         let n=a.len();
@@ -4842,7 +4842,7 @@ impl<T> MeetInTheMiddle for Vec<T> where T: Copy + Sized + PartialOrd {
     }
 }
 
-/// N1×N2行列の構造体（num::powで行列累乗を計算できる）
+/// N1×N2行列の構造体（num::powで行列累乗を計算できるようにしている）
 #[derive(Clone, Debug)]
 pub struct Matrix<T, const N1: usize, const N2: usize> {
     pub matrix: [[T;N2];N1]
@@ -4872,9 +4872,6 @@ impl<T, const N1: usize, const N2: usize> PartialEq for Matrix<T,N1,N2> where T:
             }
         }
         ret
-    }
-    fn ne(&self, other: &Self) -> bool {
-        !self.eq(other)
     }
 }
 
@@ -4906,9 +4903,6 @@ impl<T, const N: usize> OneElement for Matrix<T,N,N> where T: Copy + ZeroElement
 impl<T, const N: usize> num::One for Matrix<T,N,N> where T: Copy + ZeroElement + OneElement + std::ops::AddAssign + std::ops::Mul<Output=T> + PartialEq {
     fn one() -> Self {
         Self::one_element()
-    }
-    fn is_one(&self) -> bool {
-        *self==Self::one()
     }
 }
 
@@ -4989,6 +4983,220 @@ impl<T, const N1: usize, const N2: usize, const N3: usize> std::ops::Mul<Matrix<
     }
 }
 
+/// 行列のトレイト
+pub trait Matrices where Self: Sized + std::ops::Index<usize>, Self::Output: std::ops::Index<usize> {
+    /// 零行列を返す関数
+    fn zero_matrix(row_len: usize, column_len: usize) -> Self;
+    /// 単位行列を返す関数
+    fn identity_matrix(len: usize) -> Self;
+    /// 行列の和を割り当てる関数
+    fn matrix_add_assign(&mut self, rhs: Self);
+    /// 行列の和を返す関数
+    fn matrix_add(&self, rhs: Self) -> Self;
+    /// 行列の差を割り当てる関数
+    fn matrix_sub_assign(&mut self, rhs: Self);
+    /// 行列の差を返す関数
+    fn matrix_sub(&self, rhs: Self) -> Self;
+    /// 行列の定数倍を割り当てる関数
+    fn matrix_scalar_assign(&mut self, k: isize);
+    /// 行列の定数倍を返す関数
+    fn matrix_scalar(&self, k: isize) -> Self;
+    /// 行列の積を割り当てる関数
+    fn matrix_mul_assign(&mut self, rhs: Self);
+    /// 行列の積を返す関数
+    fn matrix_mul(&self, rhs: Self) -> Self;
+    /// 逆行列が存在するならば、それを返す関数（返り値はOption）
+    fn matrix_inverse(&self) -> Option<Self>;
+    /// 掃き出し法を行い、行列の既約行階段形を返す関数
+    fn gaussian_elimination(&self) -> Self;
+    /// 行列式を返す関数
+    fn determinant(&self) -> <Self::Output as std::ops::Index<usize>>::Output;
+}
+
+impl<M> Matrices for Vec<Vec<ac_library::StaticModInt<M>>> where M: ac_library::Modulus {
+    fn zero_matrix(row_len: usize, column_len: usize) -> Self {
+        vec![vec![<Self::Output as std::ops::Index<usize>>::Output::zero_element();column_len];row_len]
+    }
+    fn identity_matrix(len: usize) -> Self {
+        let mut ret=vec![vec![<Self::Output as std::ops::Index<usize>>::Output::zero_element();len];len];
+        for i in 0..len {
+            ret[i][i]=<Self::Output as std::ops::Index<usize>>::Output::one_element();
+        }
+        ret
+    }
+    fn matrix_add_assign(&mut self, rhs: Self) {
+        debug_assert_eq!(self.len(), rhs.len());
+        for i in 0..self.len() {
+            debug_assert_eq!(self[i].len(), self[0].len());
+            debug_assert_eq!(self[i].len(), rhs[i].len());
+            for j in 0..self[i].len() {
+                self[i][j]+=rhs[i][j].clone();
+            }
+        }
+    }
+    fn matrix_add(&self, rhs: Self) -> Self {
+        let mut ret=self.clone();
+        ret.matrix_add_assign(rhs);
+        ret
+    }
+    fn matrix_sub_assign(&mut self, rhs: Self) {
+        debug_assert_eq!(self.len(), rhs.len());
+        for i in 0..self.len() {
+            debug_assert_eq!(self[i].len(), self[0].len());
+            debug_assert_eq!(self[i].len(), rhs[i].len());
+            for j in 0..self[i].len() {
+                self[i][j]-=rhs[i][j].clone();
+            }
+        }
+    }
+    fn matrix_sub(&self, rhs: Self) -> Self {
+        let mut ret=self.clone();
+        ret.matrix_sub_assign(rhs);
+        ret
+    }
+    fn matrix_scalar_assign(&mut self, k: isize) {
+        for i in 0..self.len() {
+            debug_assert_eq!(self[i].len(), self[0].len());
+            for j in 0..self[i].len() {
+                self[i][j]*=k;
+            }
+        }
+    }
+    fn matrix_scalar(&self, k: isize) -> Self {
+        let mut ret=self.clone();
+        ret.matrix_scalar_assign(k);
+        ret
+    }
+    fn matrix_mul_assign(&mut self, rhs: Self) where <Self::Output as std::ops::Index<usize>>::Output: Clone + std::ops::MulAssign {
+        *self=self.matrix_mul(rhs);
+    }
+    fn matrix_mul(&self, rhs: Self) -> Self {
+        debug_assert_eq!(self[0].len(), rhs.len());
+        let mut prod=Self::zero_matrix(self.len(), rhs[0].len());
+        for i in 0..self.len() {
+            debug_assert_eq!(self[i].len(), self[0].len());
+            for j in 0..rhs[i].len() {
+                for k in 0..rhs.len() {
+                    debug_assert_eq!(rhs[k].len(), rhs[0].len());
+                    prod[i][j]+=self[i][k].clone()*rhs[k][j].clone();
+                }
+            }
+        }
+        prod
+    }
+    fn matrix_inverse(&self) -> Option<Self> {
+        let mut matrix=self.clone();
+        let n=matrix.len();
+        let mut ans=Self::identity_matrix(n);
+        for i in 0..n {
+            debug_assert_eq!(matrix[i].len(), n);
+            if matrix[i][i]==ac_library::StaticModInt::<M>::new(0) {
+                let mut pivot=false;
+                for j in i+1..n {
+                    if matrix[j][i]!=ac_library::StaticModInt::<M>::new(0) {
+                        pivot=true;
+                        ans.swap(i, j);
+                        matrix.swap(i, j);
+                        break;
+                    }
+                }
+                if !pivot {
+                    return None;
+                }
+            }
+            for j in 0..n {
+                if i==j {
+                    continue;
+                }
+                let c=matrix[j][i]/matrix[i][i];
+                for k in 0..n {
+                    ans[j][k]=ans[j][k]-c*ans[i][k];
+                    matrix[j][k]=matrix[j][k]-c*matrix[i][k];
+                }
+            }
+            let c=ac_library::StaticModInt::<M>::new(1)/matrix[i][i];
+            for k in 0..n {
+                ans[i][k]*=c;
+                matrix[i][k]*=c;
+            }
+        }
+        Some(ans)
+    }
+    fn gaussian_elimination(&self) -> Self {
+        let mut matrix=self.clone();
+        let row_len=matrix.len();
+        let col_len=matrix[0].len();
+        let mut cur_col=0;
+        for i in 0..row_len {
+            if cur_col==col_len {
+                break;
+            }
+            debug_assert_eq!(matrix[i].len(), col_len);
+            while cur_col<col_len && matrix[i][cur_col]==ac_library::StaticModInt::<M>::new(0) {
+                let mut pivot=false;
+                for j in i+1..row_len {
+                    if matrix[j][cur_col]!=ac_library::StaticModInt::<M>::new(0) {
+                        pivot=true;
+                        matrix.swap(i, j);
+                        break;
+                    }
+                }
+                if !pivot {
+                    cur_col+=1;
+                }
+            }
+            if cur_col==col_len {
+                break;
+            }
+            for j in 0..row_len {
+                if i==j {
+                    continue;
+                }
+                let c=matrix[j][cur_col]/matrix[i][cur_col];
+                for k in 0..col_len {
+                    matrix[j][k]=matrix[j][k]-c*matrix[i][k];
+                }
+            }
+            let c=ac_library::StaticModInt::<M>::new(1)/matrix[i][cur_col];
+            for k in 0..col_len {
+                matrix[i][k]*=c;
+            }
+            cur_col+=1;
+        }
+        matrix
+    }
+    fn determinant(&self) -> <Self::Output as std::ops::Index<usize>>::Output {
+        let mut matrix=self.clone();
+        let n=matrix.len();
+        let mut ans=ac_library::StaticModInt::<M>::new(1);
+        for i in 0..n {
+            debug_assert_eq!(matrix[i].len(), n);
+            if matrix[i][i]==ac_library::StaticModInt::<M>::new(0) {
+                let mut pivot=false;
+                for j in i+1..n {
+                    if matrix[j][i]!=ac_library::StaticModInt::<M>::new(0) {
+                        pivot=true;
+                        matrix.swap(i, j);
+                        ans*=-1;
+                        break;
+                    }
+                }
+                if !pivot {
+                    return ac_library::StaticModInt::<M>::new(0);
+                }
+            }
+            for j in i+1..n {
+                let c=matrix[j][i]/matrix[i][i];
+                for k in i..n {
+                    matrix[j][k]=matrix[j][k]-c*matrix[i][k];
+                }
+            }
+            ans*=matrix[i][i];
+        }
+        ans
+    }
+}
+
 /// 永続stackの構造体
 #[derive(Clone, Debug)]
 pub struct PersistentStack<T> {
@@ -5036,48 +5244,6 @@ impl<T> PersistentStack<T> where T: Default + Clone {
     /// 指定した番号のstackに戻す関数（toは戻す先でcurrent_number関数の返す番号と同じ）
     pub fn rollback(&mut self, to: usize) {
         self.stack.push(self.stack[to].clone());
-    }
-}
-
-/// 行列式を求めるトレイト
-pub trait Determinant {
-    /// 行列式の型
-    type Output;
-    /// 行列式を求める関数
-    fn determinant(&self) -> Self::Output;
-}
-
-impl<M> Determinant for Vec<Vec<ac_library::StaticModInt<M>>> where M: ac_library::Modulus {
-    type Output = ac_library::StaticModInt<M>;
-    fn determinant(&self) -> Self::Output {
-        let mut matrix=self.clone();
-        let n=matrix.len();
-        let mut ans=ac_library::StaticModInt::<M>::new(1);
-        for i in 0..n {
-            debug_assert_eq!(matrix[i].len(), n);
-            if matrix[i][i]==ac_library::StaticModInt::<M>::new(0) {
-                let mut pivot=false;
-                for j in i+1..n {
-                    if matrix[j][i]!=ac_library::StaticModInt::<M>::new(0) {
-                        pivot=true;
-                        matrix.swap(i, j);
-                        ans*=-1;
-                        break;
-                    }
-                }
-                if !pivot {
-                    return ac_library::StaticModInt::<M>::new(0);
-                }
-            }
-            for j in i+1..n {
-                for k in i+1..n {
-                    matrix[j][k]=matrix[j][k]-matrix[j][i]/matrix[i][i]*matrix[i][k];
-                }
-                matrix[j][i]=ac_library::StaticModInt::<M>::new(0);
-            }
-            ans*=matrix[i][i];
-        }
-        ans
     }
 }
 
@@ -5705,11 +5871,11 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     /// 形式的冪級数の和を割り当てる関数
     fn fps_add_assign(&mut self, g: &Self);
     /// 形式的冪級数の和を返す関数
-    fn fps_add(f: &Self, g: &Self) -> Self;
+    fn fps_add(&self, g: &Self) -> Self;
     /// 形式的冪級数の差を割り当てる関数
     fn fps_sub_assign(&mut self, g: &Self);
     /// 形式的冪級数の差を返す関数
-    fn fps_sub(f: &Self, g: &Self) -> Self;
+    fn fps_sub(&self, g: &Self) -> Self;
     /// 形式的冪級数の定数倍を割り当てる関数
     fn fps_scalar_assign(&mut self, k: isize);
     /// 形式的冪級数の定数倍を返す関数
@@ -5717,7 +5883,7 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     /// 形式的冪級数の積を割り当てる関数
     fn fps_mul_assign(&mut self, g: &Self, deg: usize);
     /// 形式的冪級数の積を返す関数
-    fn fps_mul(f: &Self, g: &Self, deg: usize) -> Self;
+    fn fps_mul(&self, g: &Self, deg: usize) -> Self;
     /// 形式的冪級数の逆元を割り当てる関数
     fn fps_inv_assign(&mut self, deg: usize);
     /// 形式的冪級数の逆元を返す関数
@@ -5725,7 +5891,7 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     /// 形式的冪級数の商を割り当てる関数
     fn fps_div_assign(&mut self, g: &Self, deg: usize);
     /// 形式的冪級数の商を返す関数
-    fn fps_div(f: &Self, g: &Self, deg: usize) -> Self;
+    fn fps_div(&self, g: &Self, deg: usize) -> Self;
     /// 形式的冪級数の導関数を割り当てる関数
     fn fps_diff_assign(&mut self);
     /// 形式的冪級数の導関数を返す関数
@@ -5753,11 +5919,11 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     /// 疎な形式的冪級数との積を割り当てる関数
     fn sparse_fps_mul_assign(&mut self, g: &Self::Sparse, deg: usize);
     /// 疎な形式的冪級数との積を返す関数
-    fn sparse_fps_mul(f: &Self, g: &Self::Sparse, deg: usize) -> Self;
+    fn sparse_fps_mul(&self, g: &Self::Sparse, deg: usize) -> Self;
     /// 疎な形式的冪級数による商を割り当てる関数
     fn sparse_fps_div_assign(&mut self, g: &Self::Sparse, deg: usize);
     /// 疎な形式的冪級数による商を返す関数
-    fn sparse_fps_div(f: &Self, g: &Self::Sparse, deg: usize) -> Self;
+    fn sparse_fps_div(&self, g: &Self::Sparse, deg: usize) -> Self;
     /// 形式的冪級数の配列を受け取ってその総積を計算し、配列を破壊して最初の要素に総積を代入する関数
     fn fps_prod_merge(fs: &mut Vec<Self>);
     /// Berlekamp-Masseyアルゴリズムを行う関数
@@ -5777,7 +5943,7 @@ pub trait FPS where Self: Sized + std::ops::Index<usize> {
     fn fps_comp_assign(&mut self, g: &Self, deg: usize);
     /// 形式的冪級数の合成f(g(x))を返す関数
     /// <https://qiita.com/ryuhe1/items/23d79bb84b270f7359e0>
-    fn fps_comp(f: &Self, g: &Self, deg: usize) -> Self;
+    fn fps_comp(&self, g: &Self, deg: usize) -> Self;
 }
 
 impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
@@ -5800,8 +5966,8 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]+=g[i];
         }
     }
-    fn fps_add(f: &Self, g: &Self) -> Self {
-        let mut h=f.clone();
+    fn fps_add(&self, g: &Self) -> Self {
+        let mut h=self.clone();
         h.fps_add_assign(&g);
         h
     }
@@ -5811,8 +5977,8 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]-=g[i];
         }
     }
-    fn fps_sub(f: &Self, g: &Self) -> Self {
-        let mut h=f.clone();
+    fn fps_sub(&self, g: &Self) -> Self {
+        let mut h=self.clone();
         h.fps_sub_assign(&g);
         h
     }
@@ -5828,11 +5994,11 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
     }
     fn fps_mul_assign(&mut self, g: &Self, deg: usize) {
         debug_assert!(self.len()+g.len()-1>deg);
-        *self=FPS::fps_mul(self, g, deg);
+        *self=self.fps_mul(g, deg);
     }
-    fn fps_mul(f: &Self, g: &Self, deg: usize) -> Self {
-        debug_assert!(f.len()+g.len()-1>deg);
-        ac_library::convolution::convolution(&f[0..], &g[0..])[0..=deg].to_vec()
+    fn fps_mul(&self, g: &Self, deg: usize) -> Self {
+        debug_assert!(self.len()+g.len()-1>deg);
+        ac_library::convolution::convolution(&self[0..], &g[0..])[0..=deg].to_vec()
     }
     fn fps_inv_assign(&mut self, deg: usize) {
         debug_assert!(self.len()>deg);
@@ -5857,9 +6023,9 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         debug_assert!(self.len()+g.len()-1>deg);
         self.fps_mul_assign(&g.fps_inv(g.len()-1), deg);
     }
-    fn fps_div(f: &Self, g: &Self, deg: usize) -> Self {
-        debug_assert!(f.len()+g.len()-1>deg);
-        let mut h=f.clone();
+    fn fps_div(&self, g: &Self, deg: usize) -> Self {
+        debug_assert!(self.len()+g.len()-1>deg);
+        let mut h=self.clone();
         h.fps_div_assign(&g, deg);
         h
     }
@@ -6011,8 +6177,8 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             }
         }
     }
-    fn sparse_fps_mul(f: &Self, g: &Self::Sparse, deg: usize) -> Self {
-        let mut h=f.clone();
+    fn sparse_fps_mul(&self, g: &Self::Sparse, deg: usize) -> Self {
+        let mut h=self.clone();
         h.sparse_fps_mul_assign(g, deg);
         h
     }
@@ -6035,8 +6201,8 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             self[i]*=cinv;
         }
     }
-    fn sparse_fps_div(f: &Self, g: &Self::Sparse, deg: usize) -> Self {
-        let mut h=f.clone();
+    fn sparse_fps_div(&self, g: &Self::Sparse, deg: usize) -> Self {
+        let mut h=self.clone();
         h.sparse_fps_div_assign(g, deg);
         h
     }
@@ -6148,7 +6314,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         if n<self.len() {
             return self[n];
         }
-        let p=Self::fps_mul(&self.fps_prefix(berlekamp_massey.len()-1), berlekamp_massey, berlekamp_massey.len().saturating_sub(2));
+        let p=&self.fps_prefix(berlekamp_massey.len()-1).fps_mul(berlekamp_massey, berlekamp_massey.len().saturating_sub(2));
         Self::bostan_mori(&p, berlekamp_massey, n)
     }
     fn fps_pow_coefficients(&self, n: usize, k: usize) -> Self {
@@ -6217,7 +6383,7 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
             k/=2;
             y_deg*=2;
         }
-        Self::fps_div(&p[0], &q[0], min(p[0].len()+q[0].len()-2,n-1)).fps_prefix(n)
+        p[0].fps_div(&q[0], min(p[0].len()+q[0].len()-2,n-1)).fps_prefix(n)
     }
     fn fps_comp_inv_assign(&mut self, deg: usize) {
         *self=self.fps_comp_inv(deg);
@@ -6239,9 +6405,9 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         g
     }
     fn fps_comp_assign(&mut self, g: &Self, deg: usize) {
-        *self=Self::fps_comp(self, g, deg);
+        *self=self.fps_comp(g, deg);
     }
-    fn fps_comp(f: &Self, g: &Self, deg: usize) -> Self {
+    fn fps_comp(&self, g: &Self, deg: usize) -> Self {
         let n=deg+1;
         let mut q=vec![vec![];min(g.len(),n)];
         q[0]=vec![ac_library::StaticModInt::<M>::new(1),-g[0]];
@@ -6291,14 +6457,14 @@ impl<M> FPS for Vec<ac_library::StaticModInt<M>> where M: ac_library::Modulus {
         }
         let mut p=if n.count_ones()>1 {
             let mut p=vec![vec![ac_library::StaticModInt::<M>::new(0);n+1]];
-            for i in 0..min(f.len(),n) {
-                p[0][n-i]=f[i];
+            for i in 0..min(self.len(),n) {
+                p[0][n-i]=self[i];
             }
             p
         } else {
             let mut p=vec![vec![ac_library::StaticModInt::<M>::new(0);n]];
-            for i in 0..min(f.len(),n) {
-                p[0][n-i-1]=f[i];
+            for i in 0..min(self.len(),n) {
+                p[0][n-i-1]=self[i];
             }
             p
         };
