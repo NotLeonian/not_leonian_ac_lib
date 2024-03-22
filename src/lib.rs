@@ -894,7 +894,7 @@ macro_rules! minimal_element {
     }
 }
 
-minimal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+minimal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
 
 /// 最大元を定義するトレイト
 pub trait MaximalElement {
@@ -914,7 +914,7 @@ macro_rules! maximal_element {
     }
 }
 
-maximal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+maximal_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
 
 /// 配列やベクターに末尾から数えたインデックスでアクセスするトレイト
 pub trait GetFromLast {
@@ -3214,6 +3214,94 @@ impl<T> TwoDimPrefixSum for Vec<Vec<T>> where T: Clone + ZeroElement + std::ops:
         debug_assert!(r_i <= self.len());
         debug_assert!(r_j <= self[0].len());
         self[r_i][r_j].clone()-self[r_i][l_j].clone()-self[l_i][r_j].clone()+self[l_i][l_j].clone()
+    }
+}
+
+/// 半環を定義するトレイト
+pub trait Rig {
+    type S: Clone;
+    /// 加法単位元を定義する関数
+    fn additive_identity() -> Self::S;
+    /// 和を定義する関数
+    fn add(a: &Self::S, b: &Self::S) -> Self::S;
+    /// 乗法単位元を定義する関数
+    fn multiplicative_identity() -> Self::S;
+    /// 積を定義する関数
+    fn mul(a: &Self::S, b: &Self::S) -> Self::S;
+
+    /// 連続部分列の要素の総積の総和を返す関数
+    fn sum_of_subarray_products(a: &Vec<Self::S>) -> Self::S where Self::S: PartialEq {
+        let n=a.len();
+        let mut ret=Self::additive_identity();
+        let mut prod=Self::additive_identity();
+        for i in 0..n {
+            if i==0 {
+                prod=a[i].clone();
+            } else {
+                if prod==Self::multiplicative_identity() {
+                    prod=Self::add(&a[i], &a[i]);
+                } else {
+                    prod=Self::add(&Self::mul(&prod, &a[i]), &a[i]);
+                }
+            }
+            ret=Self::add(&ret, &prod);
+        }
+        ret
+    }
+}
+
+/// minと加算を演算とする半環の構造体
+pub struct MinPlus<S>(std::marker::PhantomData<S>);
+
+impl<S> Rig for MinPlus<S> where S: Clone + PartialOrd + std::ops::Add<Output=S> + MaximalElement + ZeroElement {
+    type S = S;
+    fn additive_identity() -> Self::S {
+        S::maximal_element()
+    }
+    fn add(a: &Self::S, b: &Self::S) -> Self::S {
+        min(a.clone(),b.clone())
+    }
+    fn multiplicative_identity() -> Self::S {
+        S::zero_element()
+    }
+    fn mul(a: &Self::S, b: &Self::S) -> Self::S {
+        a.clone()+b.clone()
+    }
+}
+
+/// maxと加算を演算とする半環の構造体
+pub struct MaxPlus<S>(std::marker::PhantomData<S>);
+
+impl<S> Rig for MaxPlus<S> where S: Clone + PartialOrd + std::ops::Add<Output=S> + MinimalElement + ZeroElement {
+    type S = S;
+    fn additive_identity() -> Self::S {
+        S::minimal_element()
+    }
+    fn add(a: &Self::S, b: &Self::S) -> Self::S {
+        max(a.clone(),b.clone())
+    }
+    fn multiplicative_identity() -> Self::S {
+        S::zero_element()
+    }
+    fn mul(a: &Self::S, b: &Self::S) -> Self::S {
+        a.clone()+b.clone()
+    }
+}
+
+/// 最小部分配列問題や最大部分配列問題のトレイト
+pub trait MinMaxSubarray where Self: std::ops::Index<usize> {
+    /// 最小部分配列問題を解く関数
+    fn minimum_subarray(&self) -> Self::Output;
+    /// 最大部分配列問題を解く関数
+    fn maximum_subarray(&self) -> Self::Output;
+}
+
+impl<S> MinMaxSubarray for Vec<S> where S: Clone + PartialOrd + std::ops::Add<Output=S> + MinimalElement + MaximalElement + ZeroElement {
+    fn minimum_subarray(&self) -> Self::Output {
+        MinPlus::<S>::sum_of_subarray_products(self)
+    }
+    fn maximum_subarray(&self) -> Self::Output {
+        MaxPlus::<S>::sum_of_subarray_products(self)
     }
 }
 
