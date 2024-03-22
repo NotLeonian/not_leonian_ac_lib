@@ -862,6 +862,20 @@ macro_rules! one_element {
 
 one_element!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 
+/// 10のi乗の定数
+pub const E: [usize;20]=gen_e();
+
+/// 10のi乗の定数を生成するconst関数
+const fn gen_e() -> [usize;20] {
+    let mut e=[1;20];
+    let mut i=1;
+    while i<20 {
+        e[i]=e[i-1]*10;
+        i+=1;
+    }
+    e
+}
+
 /// 最小元を定義するトレイト
 pub trait MinimalElement {
     /// 最小元を定義する関数
@@ -995,6 +1009,80 @@ impl<T> SortAndDedup for Vec<T> where T: Ord {
     fn sort_and_dedup(&mut self) {
         self.sort();
         self.dedup();
+    }
+}
+
+/// 単一の文字を数値に変換する関数のトレイト
+pub trait FromChar {
+    /// 文字を数値に変換する関数（0-basedの閉区間）
+    fn from_foo(self, begin: char, end: char) -> usize;
+    /// 数字（文字）を1桁の数値に変換する関数
+    fn from_fig(self) -> usize;
+    /// 大文字のアルファベットを1桁の数値に変換する関数（0-based）
+    fn from_uppercase(self) -> usize;
+    /// 小文字のアルファベットを1桁の数値に変換する関数（0-based）
+    fn from_lowercase(self) -> usize;
+}
+
+impl FromChar for char {
+    fn from_foo(self, begin: char, end: char) -> usize {
+        if self>=begin && self<=end {
+            return self as usize-begin as usize;
+        } else {
+            panic!();
+        }
+    }
+    fn from_fig(self) -> usize {
+        self.from_foo('0', '9')
+    }
+    fn from_uppercase(self) -> usize {
+        self.from_foo('A', 'Z')
+    }
+    fn from_lowercase(self) -> usize {
+        self.from_foo('a', 'z')
+    }
+}
+
+/// 数値を単一の文字に変換する関数のトレイト
+pub trait ToChar {
+    /// 数値を文字に変換する関数（0-based）
+    fn to_foo(self, begin: char, width: usize) -> char;
+    /// 1桁の数値を数字（文字）に変換する関数
+    fn to_fig(self) -> char;
+    /// 1桁の数値を大文字のアルファベットに変換する関数（0-based）
+    fn to_uppercase(self) -> char;
+    /// 1桁の数値を小文字のアルファベットに変換する関数（0-based）
+    fn to_lowercase(self) -> char;
+}
+
+impl ToChar for usize {
+    fn to_foo(self, begin: char, width: usize) -> char {
+        if self<width {
+            return char::from_u32(self as u32+begin as u32).unwrap();
+        } else {
+            panic!();
+        }
+    }
+    fn to_fig(self) -> char {
+        self.to_foo('0', 10)
+    }
+    fn to_uppercase(self) -> char {
+        self.to_foo('A', 26)
+    }
+    fn to_lowercase(self) -> char {
+        self.to_foo('a', 26)
+    }
+}
+
+/// 数の文字列の10進法への変換についてのトレイト
+pub trait ToDecimal {
+    /// radix進法の数の文字列を10進数の数値へ変換する関数
+    fn to_decimal(&self, radix: usize) -> usize;
+}
+
+impl ToDecimal for String {
+    fn to_decimal(&self, radix: usize) -> usize {
+        usize::from_str_radix(&self, radix as u32).unwrap()
     }
 }
 
@@ -1153,6 +1241,18 @@ impl<T> OperateIfNotMax for T where T: Copy + PartialEq<T> + MaximalElement {
         } else {
             Self::maximal_element()
         }
+    }
+}
+
+/// 2進法で0-basedでの桁数を求めるトレイト（厳密にはその数以下の最大の2冪の2底logの値）
+pub trait BitDigits {
+    /// 2進法で0-basedでの桁数を求める関数（厳密にはその数以下の最大の2冪の2底logの値）
+    fn bit_digits(self) -> usize;
+}
+
+impl<T> BitDigits for T where Self: num::PrimInt {
+    fn bit_digits(self) -> usize {
+        (Self::zero().leading_zeros()-self.leading_zeros()-1) as usize
     }
 }
 
@@ -7685,106 +7785,6 @@ impl FullyPersistentDSU {
         self.parents.rollback(self.numbers[to]);
         self.numbers.push(self.parents.current_number());
     }
-}
-
-/// 単一の文字を数値に変換する関数のトレイト
-pub trait FromChar {
-    /// 文字を数値に変換する関数（0-basedの閉区間）
-    fn from_foo(self, begin: char, end: char) -> usize;
-    /// 数字（文字）を1桁の数値に変換する関数
-    fn from_fig(self) -> usize;
-    /// 大文字のアルファベットを1桁の数値に変換する関数（0-based）
-    fn from_uppercase(self) -> usize;
-    /// 小文字のアルファベットを1桁の数値に変換する関数（0-based）
-    fn from_lowercase(self) -> usize;
-}
-
-impl FromChar for char {
-    fn from_foo(self, begin: char, end: char) -> usize {
-        if self>=begin && self<=end {
-            return self as usize-begin as usize;
-        } else {
-            panic!();
-        }
-    }
-    fn from_fig(self) -> usize {
-        self.from_foo('0', '9')
-    }
-    fn from_uppercase(self) -> usize {
-        self.from_foo('A', 'Z')
-    }
-    fn from_lowercase(self) -> usize {
-        self.from_foo('a', 'z')
-    }
-}
-
-/// 数値を単一の文字に変換する関数のトレイト
-pub trait ToChar {
-    /// 数値を文字に変換する関数（0-based）
-    fn to_foo(self, begin: char, width: usize) -> char;
-    /// 1桁の数値を数字（文字）に変換する関数
-    fn to_fig(self) -> char;
-    /// 1桁の数値を大文字のアルファベットに変換する関数（0-based）
-    fn to_uppercase(self) -> char;
-    /// 1桁の数値を小文字のアルファベットに変換する関数（0-based）
-    fn to_lowercase(self) -> char;
-}
-
-impl ToChar for usize {
-    fn to_foo(self, begin: char, width: usize) -> char {
-        if self<width {
-            return char::from_u32(self as u32+begin as u32).unwrap();
-        } else {
-            panic!();
-        }
-    }
-    fn to_fig(self) -> char {
-        self.to_foo('0', 10)
-    }
-    fn to_uppercase(self) -> char {
-        self.to_foo('A', 26)
-    }
-    fn to_lowercase(self) -> char {
-        self.to_foo('a', 26)
-    }
-}
-
-/// 数の文字列の10進法への変換についてのトレイト
-pub trait ToDecimal {
-    /// radix進法の数の文字列を10進数の数値へ変換する関数
-    fn to_decimal(&self, radix: usize) -> usize;
-}
-
-impl ToDecimal for String {
-    fn to_decimal(&self, radix: usize) -> usize {
-        usize::from_str_radix(&self, radix as u32).unwrap()
-    }
-}
-
-/// 2進法で0-basedでの桁数を求めるトレイト（厳密にはその数以下の最大の2冪の2底logの値）
-pub trait BitDigits {
-    /// 2進法で0-basedでの桁数を求める関数（厳密にはその数以下の最大の2冪の2底logの値）
-    fn bit_digits(self) -> usize;
-}
-
-impl<T> BitDigits for T where Self: num::PrimInt {
-    fn bit_digits(self) -> usize {
-        (Self::zero().leading_zeros()-self.leading_zeros()-1) as usize
-    }
-}
-
-/// 10のi乗の定数
-pub const E: [usize;20]=gen_e();
-
-/// 10のi乗の定数を生成するconst関数
-const fn gen_e() -> [usize;20] {
-    let mut e=[1;20];
-    let mut i=1;
-    while i<20 {
-        e[i]=e[i-1]*10;
-        i+=1;
-    }
-    e
 }
 
 /// 素数位数の有限体の元で表された有理数を推測するトレイト
