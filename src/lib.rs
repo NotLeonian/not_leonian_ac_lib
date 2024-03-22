@@ -3622,31 +3622,71 @@ impl MexMultiSet {
     }
 }
 
-/// BTreeSetを用いて区間を管理する集合についての型
-pub type RangeSet<T>=std::collections::BTreeSet<(T,T)>;
-
-/// 区間を管理する集合のトレイト（現状は区間追加と区間削除には非対応）
-pub trait SetOfRanges<T> {
-    /// 初期化する関数
-    fn initialize() -> Self;
-    /// valが集合に属するかどうかを判定し、属するならば属する区間を返す関数（返り値はOption）
-    fn includes(&self, val: T) -> Option<(T,T)>;
-    /// valを集合に追加する関数（返り値は追加できたかどうか）
-    fn insert_one(&mut self, val: T) -> bool;
-    /// valを集合から削除する関数（返り値は削除できたかどうか）
-    fn remove_one(&mut self, val: T) -> bool;
-    /// 集合のmexを返す関数（isizeの場合も非負整数に限って考える）
-    fn mex(&self) -> T;
+/// 区間を管理できる構造体（左閉右開区間で管理）
+#[derive(Clone, Debug)]
+pub struct RangeSet<T> where T: num::PrimInt {
+    map: std::collections::BTreeMap<T,T>
 }
 
-impl SetOfRanges<usize> for std::collections::BTreeSet<(usize,usize)> {
-    fn initialize() -> Self {
-        std::collections::BTreeSet::default()
+impl<T> RangeSet<T> where T: num::PrimInt {
+    pub fn new() -> Self {
+        Self { map: std::collections::BTreeMap::<T,T>::default() }
     }
-    fn includes(&self, val: usize) -> Option<(usize,usize)> {
-        if let Some(&range)=self.range(..(val+1,val+1)).last() {
-            if val<=range.1 {
-                Some(range)
+    /// 区間を挿入する関数
+    pub fn insert_range(&mut self, range: std::ops::Range<T>) {
+        let mut l=range.start;
+        let mut r=range.end;
+        if l==r {
+            return;
+        }
+        while let Some((&r_l,&r_r))=self.map.range(l+T::one()..=r).next() {
+            self.map.remove(&r_l);
+            if r<r_r {
+                r=r_r;
+            }
+        }
+        if let Some((&r_l,&r_r))=self.map.range(..=l).last() {
+            if l<=r_r {
+                l=r_l;
+            }
+        }
+        self.map.insert(l,r);
+    }
+    /// 1つの数を挿入する関数
+    pub fn insert_number(&mut self, x: T) {
+        self.insert_range(x..x+T::one());
+    }
+    /// 区間を削除する関数（今まで同じ区間に何回挿入したかにかかわらず削除される）
+    pub fn remove_range(&mut self, range: std::ops::Range<T>) {
+        let l=range.start;
+        let r=range.end;
+        if l==r {
+            return;
+        }
+        while let Some((&r_l,&r_r))=self.map.range(l..r).next() {
+            self.map.remove(&r_l);
+            if r<r_r {
+                self.map.insert(r,r_r);
+            }
+        }
+        if let Some((&r_l,&r_r))=self.map.range(..l).last() {
+            if l<r_r {
+                self.map.insert(r_l,l);
+            }
+            if r<r_r {
+                self.map.insert(r,r_r);
+            }
+        }
+    }
+    /// 1つの数を削除する関数（今まで同じ区間に何回挿入したかにかかわらず削除される）
+    pub fn remove_number(&mut self, x: T) {
+        self.remove_range(x..x+T::one());
+    }
+    /// xを含む区間があれば、それを返す関数（上端は含まれないものとする）（返り値は順に下端と上端のOptionで、左閉右開区間）
+    pub fn get_range(&self, x: T) -> Option<(T,T)> {
+        if let Some((&l,&r))=self.map.range(..=x).last() {
+            if x<r {
+                Some((l,r))
             } else {
                 None
             }
@@ -3654,127 +3694,33 @@ impl SetOfRanges<usize> for std::collections::BTreeSet<(usize,usize)> {
             None
         }
     }
-    fn insert_one(&mut self, val: usize) -> bool {
-        if self.includes(val).is_none() {
-            if val==0 {
-                if let Some((_,r))=self.includes(1) {
-                    self.remove(&(1,r));
-                    self.insert((0,r));
-                } else {
-                    self.insert((0,0));
-                }
-            } else if let Some((l,_))=self.includes(val-1) {
-                if let Some((_,r))=self.includes(val+1) {
-                    self.remove(&(l,val-1));
-                    self.remove(&(val+1,r));
-                    self.insert((l,r));
-                } else {
-                    self.remove(&(l,val-1));
-                    self.insert((l,val));
-                }
+    /// xとyを含む区間がともにあり、かつその区間が同じであるかを返す関数
+    pub fn same(&self, x: T, y: T) -> bool {
+        if let Some(x_range)=self.get_range(x) {
+            if let Some(y_range)=self.get_range(y) {
+                x_range==y_range
             } else {
-                if let Some((_,r))=self.includes(val+1) {
-                    self.remove(&(val+1,r));
-                    self.insert((val,r));
-                } else {
-                    self.insert((val,val));
-                }
+                false
             }
-            true
         } else {
             false
         }
     }
-    fn remove_one(&mut self, val: usize) -> bool {
-        if let Some((l,r))=self.includes(val) {
-            self.remove(&(l,r));
-            if l!=val {
-                if r!=val {
-                    self.insert((l,val-1));
-                    self.insert((val+1,r));
-                } else {
-                    self.insert((l,val-1));
-                }
-            } else if r!=val {
-                self.insert((val+1,r));
-            }
-            true
+    /// 区間に含まれない、x以上の最小の整数を返す関数
+    pub fn next_excluded_value(&self, x: T) -> T {
+        if let Some((_,r))=self.get_range(x) {
+            r
         } else {
-            false
+            x
         }
     }
-    fn mex(&self) -> usize {
-        if let Some((_,r))=self.includes(0) {
-            r+1
-        } else {
-            0
-        }
+    /// 区間のmexを返す関数
+    pub fn mex(&self) -> T {
+        self.next_excluded_value(T::zero())
     }
-}
-
-impl SetOfRanges<isize> for std::collections::BTreeSet<(isize,isize)> {
-    fn initialize() -> Self {
-        std::collections::BTreeSet::default()
-    }
-    fn includes(&self, val: isize) -> Option<(isize,isize)> {
-        if let Some(&range)=self.range(..(val+1,val+1)).last() {
-            if val<=range.1 {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }
-    fn insert_one(&mut self, val: isize) -> bool {
-        if self.includes(val).is_none() {
-            if let Some((l,_))=self.includes(val-1) {
-                if let Some((_,r))=self.includes(val+1) {
-                    self.remove(&(l,val-1));
-                    self.remove(&(val+1,r));
-                    self.insert((l,r));
-                } else {
-                    self.remove(&(l,val-1));
-                    self.insert((l,val));
-                }
-            } else {
-                if let Some((_,r))=self.includes(val+1) {
-                    self.remove(&(val+1,r));
-                    self.insert((val,r));
-                } else {
-                    self.insert((val,val));
-                }
-            }
-            true
-        } else {
-            false
-        }
-    }
-    fn remove_one(&mut self, val: isize) -> bool {
-        if let Some((l,r))=self.includes(val) {
-            self.remove(&(l,r));
-            if l!=val {
-                if r!=val {
-                    self.insert((l,val-1));
-                    self.insert((val+1,r));
-                } else {
-                    self.insert((l,val-1));
-                }
-            } else if r!=val {
-                self.insert((val+1,r));
-            }
-            true
-        } else {
-            false
-        }
-    }
-    fn mex(&self) -> isize {
-        if let Some((_,r))=self.includes(0) {
-            r+1
-        } else {
-            0
-        }
+    /// 区間の一覧をイテレータとして返す関数
+    pub fn ranges(&self) -> impl Iterator<Item=(T,T)> + '_ {
+        self.map.iter().map(|(&l,&r)| (l,r))
     }
 }
 

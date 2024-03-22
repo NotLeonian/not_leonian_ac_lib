@@ -2,6 +2,5 @@
 - const fn
 
 # 追加したいデータ構造やアルゴリズム
-- 掃き出し法
 - Trie
 - Binary Trie
