@@ -1256,6 +1256,28 @@ impl<T> BitDigits for T where Self: num::PrimInt {
     }
 }
 
+/// 要素型名をそのまま表示できる列挙型を定義できるマクロ（列挙型名;要素型名1,要素型名2,...の書式）
+#[macro_export]
+macro_rules! displayable_enum {
+    ($enum:ident;$($names:ident),+) => {
+        #[derive(Clone, Copy, Debug)]
+        enum $enum {
+            $(
+                $names,
+            )+
+        }
+        impl std::fmt::Display for $enum {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $(
+                        $enum::$names => write!(f, stringify!($names)),
+                    )+
+                }
+            }
+        }
+    };
+}
+
 /// ModInt998244353を表す型
 pub type Mint=ac_library::ModInt998244353;
 
@@ -3378,6 +3400,32 @@ impl<T> DoublyLinkedListNode<T> {
             None
         }
     }
+    /// このノードの前のノードをリストから削除し、ノードの値の所有権を移す関数（返り値はノードの値のOption）
+    pub fn remove_prev(&mut self) -> Option<T> {
+        if self.prev.clone().unwrap().borrow().val.is_some() {
+            let ret=std::mem::replace(&mut self.prev.clone().unwrap().borrow_mut().val, None);
+            let prev_prev=self.prev.clone().unwrap().borrow().prev.clone();
+            let this=self.prev.clone().unwrap().borrow().next.clone();
+            prev_prev.clone().unwrap().borrow_mut().next=this.clone();
+            self.prev=prev_prev.clone();
+            ret
+        } else {
+            None
+        }
+    }
+    /// このノードの後ろのノードをリストから削除し、ノードの値の所有権を移す関数（返り値はノードの値のOption）
+    pub fn remove_next(&mut self) -> Option<T> {
+        if self.next.clone().unwrap().borrow().val.is_some() {
+            let ret=std::mem::replace(&mut self.next.clone().unwrap().borrow_mut().val, None);
+            let this=self.next.clone().unwrap().borrow().prev.clone();
+            let next_next=self.next.clone().unwrap().borrow().next.clone();
+            self.next=next_next.clone();
+            next_next.clone().unwrap().borrow_mut().prev=this.clone();
+            ret
+        } else {
+            None
+        }
+    }
 }
 
 /// 双方向連結リストのイテレータの構造体
@@ -3681,6 +3729,10 @@ impl<T> RangeSet<T> where T: num::PrimInt {
     /// 1つの数を削除する関数（今まで同じ区間に何回挿入したかにかかわらず削除される）
     pub fn remove_number(&mut self, x: T) {
         self.remove_range(x..x+T::one());
+    }
+    /// xを含む区間があるかどうかを関数（上端は含まれないものとする）
+    pub fn contains(&self, x: T) -> bool {
+        self.get_range(x).is_some()
     }
     /// xを含む区間があれば、それを返す関数（上端は含まれないものとする）（返り値は順に下端と上端のOptionで、左閉右開区間）
     pub fn get_range(&self, x: T) -> Option<(T,T)> {
