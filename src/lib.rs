@@ -2897,25 +2897,6 @@ pub fn float_binary_search<F>(ok: f64, bad: f64, determine: F, rerror: f64) -> f
     ok
 }
 
-/// 二分探索の関数（usize）（ok_is_smallはok<badであるかどうか、-1が答えの場合はmaxが返る）
-pub fn usize_binary_search<F>(max: usize, ok_is_small: bool, determine: F) -> usize where F: Fn(usize) -> bool {
-    if ok_is_small {
-        let ret=binary_search(-1, max as isize, |mid| {
-            determine(mid as usize)
-        });
-        if ret>=0 {
-            ret as usize
-        } else {
-            max
-        }
-    } else {
-        let ret=binary_search(max as isize, -1, |mid| {
-            determine(mid as usize)
-        }) as usize;
-        ret
-    }
-}
-
 /// 広義の尺取り法を行う関数（increaseは左側の値に対して右側の値が単調増加であるか、satisfiedは返す境界がdetermineを満たすかどうか）
 /// （返り値はイテレータで、各lに対するrは-1が答えの場合mが返る）
 pub fn two_pointers<F>(n: usize, m: usize, increase: bool, satisfied: bool, determine: &F) -> impl Iterator<Item=(usize,usize)> + '_ where F: Fn(usize,usize) -> bool {
@@ -7985,7 +7966,7 @@ impl PartiallyPersistentDSU {
     /// 指定した番号のグラフにおける頂点aの属する連結成分の頂点数を返す関数（numberはcurrent_number関数の返す番号と同じ）
     pub fn size(&self, number: usize, a: usize) -> usize {
         let leader=self.leader(number, a);
-        let ind=usize_binary_search(self.parents[leader].len(), true, |mid| self.parents[leader][mid].0<=number);
+        let ind=binary_search(0, self.parents[leader].len(), |mid| self.parents[leader][mid].0<=number);
         (-self.parents[leader][ind].1) as usize
     }
     /// 現在のグラフの番号を返す関数
