@@ -204,6 +204,16 @@ pub fn output_yes_or_no(cond: bool) {
     outputif(cond, "Yes", "No");
 }
 
+/// "Yes"の1行を出力する関数
+pub fn output_yes() {
+    println!("Yes");
+}
+
+/// "No"の1行を出力する関数
+pub fn output_no() {
+    println!("No");
+}
+
 /// 存在すれば値を、存在しなければ-1を出力するトレイト
 pub trait OutputValOr {
     /// 値がmaxより小さければ自身を出力し、maxであれば-1を出力する関数
@@ -600,6 +610,20 @@ pub fn eoutput_yes_or_no(cond: bool) {
     #[cfg(debug_assertions)]
     {
         eoutputif(cond, "Yes", "No");
+    }
+}
+
+/// "Yes"の1行をstderrに出力する関数
+pub fn eoutput_yes() {
+    {
+        eprintln!("Yes");
+    }
+}
+
+/// "No"の1行をstderrに出力する関数
+pub fn eoutput_no() {
+    {
+        eprintln!("No");
     }
 }
 
