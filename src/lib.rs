@@ -3735,7 +3735,7 @@ impl<T> RangeSet<T> where T: num::PrimInt {
     pub fn remove_number(&mut self, x: T) {
         self.remove_range(x..x+T::one());
     }
-    /// xを含む区間があるかどうかを関数（上端は含まれないものとする）
+    /// xを含む区間があるかどうかを返す関数（上端は含まれないものとする）
     pub fn contains(&self, x: T) -> bool {
         self.get_range(x).is_some()
     }
@@ -4476,7 +4476,6 @@ impl<T, const N: usize> VecLCM for [T;N] where T: Copy + num::One + num_integer:
 /// modintなどで加算を行うモノイドの構造体
 pub struct Add<S>(std::marker::PhantomData<S>);
 
-/// modintなどで加算を行うモノイドのトレイト
 impl<S> ac_library::Monoid for Add<S> where S: Copy + std::ops::Add<Output=S> + ZeroElement {
     type S = S;
     fn identity() -> Self::S {
@@ -4490,7 +4489,6 @@ impl<S> ac_library::Monoid for Add<S> where S: Copy + std::ops::Add<Output=S> + 
 /// modintなどで乗算を行うモノイドの構造体
 pub struct Mul<S>(std::marker::PhantomData<S>);
 
-/// modintなどで乗算を行うモノイドのトレイト
 impl<S> ac_library::Monoid for Mul<S> where S: Copy + std::ops::Mul<Output=S> + OneElement {
     type S = S;
     fn identity() -> Self::S {
@@ -4501,10 +4499,91 @@ impl<S> ac_library::Monoid for Mul<S> where S: Copy + std::ops::Mul<Output=S> + 
     }
 }
 
+/// k番目に小さい値とその個数を、N番目までもつためのモノイドの構造体
+pub struct MinCount<S, const N: usize>(std::marker::PhantomData<S>);
+
+impl<S, const N: usize> ac_library::Monoid for MinCount<S, N> where S: Copy + PartialOrd + MaximalElement {
+    type S = [(S,usize);N];
+    fn identity() -> Self::S {
+        [(S::maximal_element(),0);N]
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        let mut vec=vec![];
+        for i in 0..N {
+            if a[i].1==0 {
+                break;
+            }
+            vec.push(a[i]);
+        }
+        for i in 0..N {
+            if b[i].1==0 {
+                break;
+            }
+            let mut exists=false;
+            for j in 0..vec.len() {
+                if b[i].0==vec[j].0 {
+                    exists=true;
+                    vec[j].1+=b[i].1;
+                    break;
+                }
+            }
+            if !exists {
+                vec.push(b[i]);
+            }
+        }
+        vec.sort_by(|&(l,_),&(r,_)| l.partial_cmp(&r).unwrap());
+        let mut ret=[(S::maximal_element(),0);N];
+        for i in 0..min(vec.len(),N) {
+            ret[i]=vec[i];
+        }
+        ret
+    }
+}
+
+/// k番目に大きい値とその個数を、N番目までもつためのモノイドの構造体
+pub struct MaxCount<S, const N: usize>(std::marker::PhantomData<S>);
+
+impl<S, const N: usize> ac_library::Monoid for MaxCount<S, N> where S: Copy + PartialOrd + MinimalElement {
+    type S = [(S,usize);N];
+    fn identity() -> Self::S {
+        [(S::minimal_element(),0);N]
+    }
+    fn binary_operation(a: &Self::S, b: &Self::S) -> Self::S {
+        let mut vec=vec![];
+        for i in 0..N {
+            if a[i].1==0 {
+                break;
+            }
+            vec.push(a[i]);
+        }
+        for i in 0..N {
+            if b[i].1==0 {
+                break;
+            }
+            let mut exists=false;
+            for j in 0..vec.len() {
+                if b[i].0==vec[j].0 {
+                    exists=true;
+                    vec[j].1+=b[i].1;
+                    break;
+                }
+            }
+            if !exists {
+                vec.push(b[i]);
+            }
+        }
+        vec.sort_by(|&(l,_),&(r,_)| r.partial_cmp(&l).unwrap());
+        let mut ret=[(S::minimal_element(),0);N];
+        for i in 0..min(vec.len(),N) {
+            ret[i]=vec[i];
+        }
+        ret
+    }
+}
+
 /// 遅延セグ木を双対セグ木として使うためのダミーの二項演算の構造体
 pub struct DummyOperation<S>(std::marker::PhantomData<S>);
 
-/// 遅延セグ木を双対セグ木として使うためのダミーの二項演算の構造体
 impl<S> ac_library::Monoid for DummyOperation<S> where S: Default + Clone {
     type S = S;
     fn identity() -> Self::S {
@@ -4518,7 +4597,6 @@ impl<S> ac_library::Monoid for DummyOperation<S> where S: Default + Clone {
 /// 区間のそれぞれの要素にアフィン変換を行う作用の構造体
 pub struct RangeAffineTransform<M>(std::marker::PhantomData<M>);
 
-/// 区間のそれぞれの要素にアフィン変換を行う作用のトレイト
 impl<M> ac_library::MapMonoid for RangeAffineTransform<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + ZeroElement + OneElement {
     type M = M;
     type F = (M::S,M::S);
@@ -4536,7 +4614,6 @@ impl<M> ac_library::MapMonoid for RangeAffineTransform<M> where M: ac_library::M
 /// 区間の長さを合わせてもつモノイドの構造体
 pub struct MonoidWithLength<M>(std::marker::PhantomData<M>);
 
-/// 区間の長さを合わせてもつモノイドのトレイト
 impl<M> ac_library::Monoid for MonoidWithLength<M> where M: ac_library::Monoid {
     type S = (M::S,usize);
     fn identity() -> Self::S {
@@ -4573,6 +4650,7 @@ macro_rules! mul_by_usize {
 
 mul_by_usize!(i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize, f32, f64);
 
+/// 区間の長さももつことで、それぞれの要素にアフィン変換を行える作用の構造体
 pub struct RangeAffineRangeSum<M>(std::marker::PhantomData<M>);
 
 impl<M> ac_library::MapMonoid for RangeAffineRangeSum<M> where M: ac_library::Monoid, M::S: std::ops::Add<Output=M::S> + std::ops::Mul<Output=M::S> + ZeroElement + OneElement + MulByUsize {
@@ -4586,6 +4664,178 @@ impl<M> ac_library::MapMonoid for RangeAffineRangeSum<M> where M: ac_library::Mo
     }
     fn composition(f: &Self::F, g: &Self::F) -> Self::F {
         (f.0.clone()*g.0.clone(),f.0.clone()*g.1.clone()+f.1.clone())
+    }
+}
+
+/// MinCountやMaxCountについて、区間加算を行う作用の構造体
+pub struct MinMaxShift<M>(std::marker::PhantomData<M>) where M: ac_library::Monoid;
+
+impl<S, const N: usize> ac_library::MapMonoid for MinMaxShift<MinCount<S,N>> where S: Copy + PartialOrd + num::PrimInt + ZeroElement + MaximalElement {
+    type M = MinCount<S,N>;
+    type F = (bool,S);
+    fn identity_map() -> Self::F {
+        (true,S::zero_element())
+    }
+    fn mapping(f: &Self::F, x: &<Self::M as ac_library::Monoid>::S) -> <Self::M as ac_library::Monoid>::S {
+        let mut ret=x.clone();
+        for i in 0..N {
+            if ret[i].1==0 {
+                break;
+            }
+            if f.0 {
+                ret[i].0=ret[i].0.saturating_add(f.1);
+            } else {
+                ret[i].0=ret[i].0.saturating_sub(f.1);
+            }
+        }
+        ret
+    }
+    fn composition(f: &Self::F, g: &Self::F) -> Self::F {
+        if f.0==g.0 {
+            (f.0,f.1+g.1)
+        } else if f.1>g.1 {
+            (f.0,f.1-g.1)
+        } else {
+            (g.0,g.1-f.1)
+        }
+    }
+}
+
+impl<S, const N: usize> ac_library::MapMonoid for MinMaxShift<MaxCount<S,N>> where S: Copy + PartialOrd + num::PrimInt + ZeroElement + MinimalElement {
+    type M = MaxCount<S,N>;
+    type F = (bool,S);
+    fn identity_map() -> Self::F {
+        (true,S::zero_element())
+    }
+    fn mapping(f: &Self::F, x: &<Self::M as ac_library::Monoid>::S) -> <Self::M as ac_library::Monoid>::S {
+        let mut ret=x.clone();
+        for i in 0..N {
+            if ret[i].1==0 {
+                break;
+            }
+            if f.0 {
+                ret[i].0=ret[i].0.saturating_add(f.1);
+            } else {
+                ret[i].0=ret[i].0.saturating_sub(f.1);
+            }
+        }
+        ret
+    }
+    fn composition(f: &Self::F, g: &Self::F) -> Self::F {
+        if f.0==g.0 {
+            (f.0,f.1+g.1)
+        } else if f.1>g.1 {
+            (f.0,f.1-g.1)
+        } else {
+            (g.0,g.1-f.1)
+        }
+    }
+}
+
+/// 区間の和集合を管理する構造体
+#[derive(Debug)]
+pub struct SetUnion {
+    n: usize,
+    lst: ac_library::LazySegtree<MinMaxShift<MinCount<usize,1>>>,
+    mst: MultiSet<(usize,usize)>
+}
+
+impl SetUnion {
+    pub fn new(n: usize) -> Self {
+        Self { n, lst: ac_library::LazySegtree::<MinMaxShift<MinCount<usize,1>>>::from(vec![[(0,1)];n]), mst: MultiSet::new() }
+    }
+    /// 区間が空でなければ追加する関数（返り値は追加したかどうか）
+    pub fn insert_range(&mut self, range: std::ops::Range<usize>) -> bool {
+        let l=range.start;
+        let r=range.end;
+        if l>=r {
+            return false;
+        }
+        debug_assert!(r <= self.n);
+        self.lst.apply_range(l..r, (true,1));
+        self.mst.insert_one((l,r));
+        true
+    }
+    /// 1つの数を追加する関数
+    pub fn insert_number(&mut self, x: usize) {
+        debug_assert!(x < self.n);
+        self.insert_range(x..x+1);
+    }
+    /// 与えた区間が空でなく追加されていれば、削除する関数（返り値は削除したかどうか）
+    pub fn remove_range(&mut self, range: std::ops::Range<usize>) -> bool {
+        let l=range.start;
+        let r=range.end;
+        if l>=r {
+            return false;
+        }
+        if self.mst.contains_key(&(l,r)) {
+            self.lst.apply_range(l..r, (false,1));
+            self.mst.remove_one((l,r));
+            true
+        } else {
+            false
+        }
+    }
+    /// 与えた1つの数が追加されていれば、削除する関数（返り値は削除したかどうか）
+    pub fn remove_number(&mut self, x: usize) -> bool {
+        self.remove_range(x..x+1)
+    }
+    /// xが和集合に含まれるかを返す関数
+    pub fn contains(&mut self, x: usize) -> bool {
+        debug_assert!(x < self.n);
+        self.lst.get(x)[0].0>0
+    }
+    /// 区間のうち、和集合に含まれる元の個数を返す関数
+    pub fn count(&mut self, range: std::ops::Range<usize>) -> usize {
+        let l=range.start;
+        let r=range.end;
+        debug_assert!(r <= self.n);
+        let (m,c)=self.lst.prod(l..r)[0];
+        if m>0 {
+            0
+        } else {
+            r-l-c
+        }
+    }
+    /// 和集合に含まれる元の個数を返す関数
+    pub fn all_count(&mut self) -> usize {
+        self.count(0..self.n)
+    }
+    /// xを含む区間の上端を返す関数（開区間）
+    pub fn get_right(&mut self, x: usize) -> usize {
+        debug_assert!(x < self.n);
+        self.lst.max_right(x, |v| v[0].0>0)
+    }
+    /// xを含む区間の下端を返す関数（閉区間）
+    pub fn get_left(&mut self, x: usize) -> usize {
+        debug_assert!(x < self.n);
+        self.lst.min_left(x+1, |v| v[0].0>0)
+    }
+    /// xを含む区間があれば、それを返す関数（返り値は順に下端と上端のOptionで、左閉右開区間）
+    pub fn get_range(&mut self, x: usize) -> Option<(usize,usize)> {
+        let l=self.get_left(x);
+        let r=self.get_right(x);
+        if l<r {
+            Some((l,r))
+        } else {
+            None
+        }
+    }
+    /// xとyを含む区間がともにあり、かつその区間が同じであるかを返す関数
+    pub fn same(&mut self, x: usize, y: usize) -> bool {
+        if let Some(x_range)=self.get_range(x) {
+            if let Some(y_range)=self.get_range(y) {
+                x_range==y_range
+            } else {
+                false
+            }
+        } else {
+            false
+        }
+    }
+    /// 和集合のmexを返す関数
+    pub fn mex(&mut self) -> usize {
+        self.get_right(0)
     }
 }
 
