@@ -1023,15 +1023,52 @@ impl<T> MoveRight for Vec<T> where T: Clone {
     }
 }
 
+/// PartialOrdを実装している型のベクターをソートする関数のトレイト
+pub trait PartialSort {
+    /// PartialOrdを実装している型のベクターをソートする関数
+    fn partial_sort(&mut self);
+}
+
+impl<T> PartialSort for Vec<T> where T: PartialOrd {
+    fn partial_sort(&mut self) {
+        self.sort_by(|l,r| l.partial_cmp(r).unwrap());
+    }
+}
+
+/// ベクターを降順にソートする関数のトレイト
+pub trait ReverseSort {
+    /// ベクターを降順にソートする関数
+    fn reverse_sort(&mut self);
+}
+
+impl<T> ReverseSort for Vec<T> where T: PartialOrd {
+    fn reverse_sort(&mut self) {
+        self.sort_by(|l,r| r.partial_cmp(l).unwrap());
+    }
+}
+
 /// ベクターをソートして重複している要素を取り除く関数のトレイト
 pub trait SortAndDedup {
     /// ベクターをソートして重複している要素を取り除く関数
     fn sort_and_dedup(&mut self);
 }
 
-impl<T> SortAndDedup for Vec<T> where T: Ord {
+impl<T> SortAndDedup for Vec<T> where T: PartialOrd {
     fn sort_and_dedup(&mut self) {
-        self.sort();
+        self.partial_sort();
+        self.dedup();
+    }
+}
+
+/// ベクターを降順にソートして重複している要素を取り除く関数のトレイト
+pub trait ReverseSortAndDedup {
+    /// ベクターを降順にソートして重複している要素を取り除く関数
+    fn reverse_sort_and_dedup(&mut self);
+}
+
+impl<T> ReverseSortAndDedup for Vec<T> where T: PartialOrd {
+    fn reverse_sort_and_dedup(&mut self) {
+        self.reverse_sort();
         self.dedup();
     }
 }
@@ -1722,6 +1759,32 @@ impl VecGraph {
             None
         }
     }
+    /// rootを根とする根つき木について、各頂点を根とする部分木の頂点数を返す関数
+    pub fn sizes_of_subtrees(&self, root: usize) -> Vec<usize> {
+        let n=self.size();
+        let mut sizes=vec![0;n];
+        let mut seen=vec![false;n];
+        seen[root]=true;
+        let mut stack=vec![root+n,root];
+        while let Some(v)=stack.pop() {
+            if v<n {
+                for &(u,_) in &self.graph[v] {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+n);
+                        stack.push(u);
+                    }
+                }
+            } else {
+                let v=v-n;
+                sizes[v]=1;
+                for &(u,_) in &self.graph[v] {
+                    sizes[v]+=sizes[u];
+                }
+            }
+        }
+        sizes
+    }
     /// グラフからUnion-Find木を構築する関数（0-based）
     pub fn construct_union_find(&self) -> ac_library::Dsu {
         let mut uf=ac_library::Dsu::new(self.size());
@@ -1903,7 +1966,7 @@ impl VecGraph {
     /// オイラーツアーの訪問順の列と、頂点に入ったときの番号と、頂点から出たときの番号を返す関数
     pub fn easiest_hld_and_euler_tour(&mut self) -> (Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>,Vec<usize>) {
         let n=self.size();
-        let mut sizes=vec![0;n];
+        let mut sizes=vec![0usize;n];
         let mut seen=vec![false;n];
         seen[0]=true;
         let mut stack=vec![n,0];
@@ -2409,6 +2472,32 @@ impl MapGraph {
         } else {
             None
         }
+    }
+    /// rootを根とする根つき木について、各頂点を根とする部分木の頂点数を返す関数
+    pub fn sizes_of_subtrees(&self, root: usize) -> Vec<usize> {
+        let n=self.size();
+        let mut sizes=vec![0;n];
+        let mut seen=vec![false;n];
+        seen[root]=true;
+        let mut stack=vec![root+n,root];
+        while let Some(v)=stack.pop() {
+            if v<n {
+                for (&u,_) in &self.graph[v] {
+                    if !seen[u] {
+                        seen[u]=true;
+                        stack.push(u+n);
+                        stack.push(u);
+                    }
+                }
+            } else {
+                let v=v-n;
+                sizes[v]=1;
+                for (&u,_) in &self.graph[v] {
+                    sizes[v]+=sizes[u];
+                }
+            }
+        }
+        sizes
     }
     /// グラフからUnion-Find木を構築する関数（0-based）
     pub fn construct_union_find(&self) -> ac_library::Dsu {
